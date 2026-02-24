@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { format } from "date-fns";
+import { format, addDays, subDays } from "date-fns";
 import {
   formatWaybackTimestamp,
   getPrevWeekWednesday,
   getLastYearWednesday,
-  toWaybackTimestamp,
 } from "@/lib/utils/dates";
 import type { CompetitorAdsApiResponse, RetailerAdData, RetailerSnapshot } from "@/types/competitor-ads";
+
+const CDX_BASE = "http://web.archive.org/cdx/search/cdx";
 
 const RETAILERS = [
   {
@@ -14,8 +15,8 @@ const RETAILERS = [
     name: "CVS Pharmacy",
     shortName: "CVS",
     color: "#CC0000",
-    url: "www.cvs.com/shop",
-    directUrl: "https://www.cvs.com/shop",
+    url: "www.cvs.com",
+    directUrl: "https://www.cvs.com",
   },
   {
     id: "walgreens",
@@ -51,35 +52,62 @@ const RETAILERS = [
   },
 ];
 
-async function getWaybackSnapshot(
+/**
+ * Search CDX within ±windowDays of targetDate.
+ * Returns the snapshot with a timestamp closest to targetDate.
+ */
+async function getCdxSnapshot(
   url: string,
   targetDate: Date,
-  label: string
+  label: string,
+  windowDays = 5
 ): Promise<RetailerSnapshot> {
-  const ts = toWaybackTimestamp(targetDate);
-  const apiUrl = `https://archive.org/wayback/available?url=${encodeURIComponent(url)}&timestamp=${ts}`;
+  const from = format(subDays(targetDate, windowDays), "yyyyMMdd");
+  const to = format(addDays(targetDate, windowDays), "yyyyMMdd");
+
+  const params = new URLSearchParams({
+    url,
+    from,
+    to,
+    output: "json",
+    fl: "timestamp,original",
+    filter: "statuscode:200",
+    limit: "5",
+    collapse: "timestamp:8", // deduplicate by day
+  });
 
   try {
-    const res = await fetch(apiUrl, { next: { revalidate: 86400 } });
-    if (!res.ok) throw new Error(`Wayback API ${res.status}`);
+    const res = await fetch(`${CDX_BASE}?${params}`, {
+      next: { revalidate: 86400 },
+    });
+    if (!res.ok) throw new Error(`CDX API ${res.status}`);
 
-    const data = await res.json();
-    const closest = data?.archived_snapshots?.closest;
-
-    if (!closest?.available) {
+    const rows: string[][] = await res.json();
+    if (!rows || rows.length < 2) {
+      // No results — widen to ±14 days if default window failed
+      if (windowDays < 14) return getCdxSnapshot(url, targetDate, label, 14);
       return { archiveUrl: null, timestamp: null, date: null, label, error: null };
     }
 
-    // Normalize to https
-    const archiveUrl = (closest.url as string).replace(
-      "http://web.archive.org",
-      "https://web.archive.org"
-    );
+    // rows[0] is the header row; find data row with timestamp closest to targetDate
+    const targetTs = parseInt(format(targetDate, "yyyyMMddHHmmss"), 10);
+    const dataRows = rows.slice(1);
 
+    let best = dataRows[0];
+    let minDiff = Math.abs(parseInt(best[0], 10) - targetTs);
+    for (const row of dataRows.slice(1)) {
+      const diff = Math.abs(parseInt(row[0], 10) - targetTs);
+      if (diff < minDiff) {
+        minDiff = diff;
+        best = row;
+      }
+    }
+
+    const [timestamp, original] = best;
     return {
-      archiveUrl,
-      timestamp: closest.timestamp,
-      date: formatWaybackTimestamp(closest.timestamp),
+      archiveUrl: `https://web.archive.org/web/${timestamp}/${original}`,
+      timestamp,
+      date: formatWaybackTimestamp(timestamp),
       label,
       error: null,
     };
@@ -89,7 +117,7 @@ async function getWaybackSnapshot(
       timestamp: null,
       date: null,
       label,
-      error: e instanceof Error ? e.message : "Wayback lookup failed",
+      error: e instanceof Error ? e.message : "CDX lookup failed",
     };
   }
 }
@@ -101,12 +129,12 @@ export async function GET() {
   const prevWeekLabel = format(prevWed, "MMM d, yyyy");
   const lastYearLabel = format(lastYearWed, "MMM d, yyyy");
 
-  // Fetch both snapshots for all 5 retailers in parallel (10 total requests)
+  // All 10 CDX lookups in parallel
   const results = await Promise.allSettled(
     RETAILERS.map(async (retailer) => {
       const [prevSnap, lastYearSnap] = await Promise.all([
-        getWaybackSnapshot(retailer.url, prevWed, prevWeekLabel),
-        getWaybackSnapshot(retailer.url, lastYearWed, lastYearLabel),
+        getCdxSnapshot(retailer.url, prevWed, prevWeekLabel),
+        getCdxSnapshot(retailer.url, lastYearWed, lastYearLabel),
       ]);
       const result: RetailerAdData = {
         id: retailer.id,
