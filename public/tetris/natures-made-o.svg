@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" width="30" height="30">
+  <rect width="30" height="30" fill="#EA580C" rx="2"/>
+  <rect x="2" y="2" width="26" height="26" fill="#C2410C" rx="1"/>
+  <!-- Vitamin jar -->
+  <rect x="7" y="10" width="16" height="14" fill="white" rx="2" opacity="0.9"/>
+  <rect x="9" y="7" width="12" height="5" fill="#FED7AA" rx="1"/>
+  <!-- Capsule inside -->
+  <ellipse cx="15" cy="17" rx="4" ry="3" fill="#F97316"/>
+  <text x="15" y="27" font-family="Arial,sans-serif" font-size="4" font-weight="bold" fill="white" text-anchor="middle">NATURE'S</text>
+</svg>

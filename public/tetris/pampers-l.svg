@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" width="30" height="30">
+  <rect width="30" height="30" fill="#0369A1" rx="2"/>
+  <rect x="2" y="2" width="26" height="26" fill="#075985" rx="1"/>
+  <!-- Diaper shape -->
+  <path d="M5 12 Q15 8 25 12 L25 22 Q15 26 5 22 Z" fill="white" opacity="0.9"/>
+  <!-- Tab -->
+  <rect x="5" y="11" width="5" height="4" fill="#BAE6FD" rx="1"/>
+  <rect x="20" y="11" width="5" height="4" fill="#BAE6FD" rx="1"/>
+  <text x="15" y="19" font-family="Arial,sans-serif" font-size="5" font-weight="bold" fill="#0369A1" text-anchor="middle">Pampers</text>
+</svg>

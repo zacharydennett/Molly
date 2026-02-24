@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" width="30" height="30">
+  <rect width="30" height="30" fill="#B45309" rx="2"/>
+  <rect x="2" y="2" width="26" height="26" fill="#92400E" rx="1"/>
+  <!-- Band-Aid strip -->
+  <rect x="4" y="12" width="22" height="6" fill="#FEF3C7" rx="3"/>
+  <!-- Center pad -->
+  <rect x="11" y="12" width="8" height="6" fill="#FDE68A" rx="1"/>
+  <!-- Perforations -->
+  <line x1="11" y1="12" x2="11" y2="18" stroke="#B45309" stroke-width="0.5" opacity="0.5"/>
+  <line x1="19" y1="12" x2="19" y2="18" stroke="#B45309" stroke-width="0.5" opacity="0.5"/>
+  <text x="15" y="27" font-family="Arial,sans-serif" font-size="4.5" font-weight="bold" fill="white" text-anchor="middle">BAND-AID</text>
+</svg>

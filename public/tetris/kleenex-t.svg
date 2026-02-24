@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" width="30" height="30">
+  <rect width="30" height="30" fill="#0284C7" rx="2"/>
+  <rect x="2" y="2" width="26" height="26" fill="#0369A1" rx="1"/>
+  <!-- Tissue box -->
+  <rect x="5" y="8" width="20" height="16" fill="white" rx="2" opacity="0.9"/>
+  <ellipse cx="15" cy="8" rx="5" ry="3" fill="#BAE6FD" opacity="0.9"/>
+  <!-- Tissue popping out -->
+  <path d="M11 8 Q15 2 19 8" fill="white" stroke="#BAE6FD" stroke-width="1"/>
+  <text x="15" y="20" font-family="Arial,sans-serif" font-size="5" font-weight="bold" fill="#0369A1" text-anchor="middle">KLEENEX</text>
+  <text x="15" y="27" font-family="Arial,sans-serif" font-size="3.5" fill="#0369A1" text-anchor="middle">Tissues</text>
+</svg>
