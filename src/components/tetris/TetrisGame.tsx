@@ -7,8 +7,8 @@ import { TetrisCanvas } from "./TetrisCanvas";
 import { TetrisControls } from "./TetrisControls";
 import { Leaderboard } from "./Leaderboard";
 import { NameEntryModal } from "./NameEntryModal";
+import { NextPieceCanvas } from "./NextPieceCanvas";
 import { formatScore } from "@/lib/utils/formatters";
-import { PIECES } from "@/lib/tetris/pieces";
 import { CELL_SIZE } from "@/lib/tetris/engine";
 import { Play, RotateCcw, Pause, Info } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -44,8 +44,7 @@ export function TetrisGame() {
     [state.score, state.level, state.lines, refresh]
   );
 
-  const nextPiece = state.nextPiece;
-  const nextPieceDef = nextPiece ? PIECES.find((p) => p.id === nextPiece.id) ?? nextPiece : null;
+  const nextPieceDef = state.nextPiece;
 
   return (
     <>
@@ -161,23 +160,8 @@ export function TetrisGame() {
             <p className="text-xs font-semibold text-molly-slate uppercase tracking-wide mb-2">Next</p>
             {nextPieceDef ? (
               <div className="space-y-1">
-                <div className="flex flex-wrap gap-1 justify-center">
-                  {nextPieceDef.shapes[0].map((row, ri) => (
-                    <div key={ri} className="flex">
-                      {row.map((cell, ci) => (
-                        <div
-                          key={ci}
-                          className="w-5 h-5 rounded-sm"
-                          style={{
-                            backgroundColor: cell ? nextPieceDef.color : "transparent",
-                            border: cell ? "1px solid rgba(255,255,255,0.3)" : undefined,
-                          }}
-                        />
-                      ))}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-center text-molly-slate font-medium">
+                <NextPieceCanvas piece={nextPieceDef} />
+                <p className="text-xs text-center text-molly-slate font-medium mt-1">
                   {nextPieceDef.name}
                 </p>
               </div>

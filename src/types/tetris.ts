@@ -5,7 +5,7 @@ export interface PieceDefinition {
   name: string;
   color: string;
   bgColor: string;
-  svgAsset: string;
+  imageAsset: string;
   shapes: number[][][];
 }
 
