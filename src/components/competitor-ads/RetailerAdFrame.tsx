@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import type { RetailerAdData, RetailerSnapshot } from "@/types/competitor-ads";
 import { ExternalLink, Archive, AlertCircle, Clock } from "lucide-react";
 
@@ -14,18 +14,9 @@ function SnapshotPane({ snapshot, retailerName, retailerColor }: SnapshotPanePro
   const [status, setStatus] = useState<"loading" | "loaded" | "failed">(
     snapshot.archiveUrl ? "loading" : "failed"
   );
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    if (!snapshot.archiveUrl) {
-      setStatus("failed");
-      return;
-    }
-    setStatus("loading");
-    timeoutRef.current = setTimeout(() => {
-      setStatus((prev) => (prev === "loading" ? "failed" : prev));
-    }, 15000);
-    return () => clearTimeout(timeoutRef.current);
+    setStatus(snapshot.archiveUrl ? "loading" : "failed");
   }, [snapshot.archiveUrl]);
 
   return (
@@ -52,7 +43,8 @@ function SnapshotPane({ snapshot, retailerName, retailerColor }: SnapshotPanePro
           {status === "loading" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 gap-2">
               <div className="animate-spin rounded-full border-2 border-slate-300 border-t-molly-navy h-6 w-6" />
-              <p className="text-xs text-molly-slate">Loading archive…</p>
+              <p className="text-xs text-molly-slate">Loading Wayback Machine archive…</p>
+              <p className="text-xs text-molly-slate opacity-60">This can take 1–2 minutes</p>
             </div>
           )}
           <iframe
@@ -60,14 +52,8 @@ function SnapshotPane({ snapshot, retailerName, retailerColor }: SnapshotPanePro
             className="w-full border-0"
             style={{ height: "560px" }}
             sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-            onLoad={() => {
-              clearTimeout(timeoutRef.current);
-              setStatus("loaded");
-            }}
-            onError={() => {
-              clearTimeout(timeoutRef.current);
-              setStatus("failed");
-            }}
+            onLoad={() => setStatus("loaded")}
+            onError={() => setStatus("failed")}
             title={`${retailerName} — ${snapshot.label}`}
           />
         </div>
@@ -99,7 +85,7 @@ function SnapshotPane({ snapshot, retailerName, retailerColor }: SnapshotPanePro
         </div>
       )}
 
-      {/* Open archive link */}
+      {/* Open in new tab — always visible so users don't have to wait for the slow iframe */}
       {snapshot.archiveUrl && (
         <a
           href={snapshot.archiveUrl}
@@ -108,7 +94,7 @@ function SnapshotPane({ snapshot, retailerName, retailerColor }: SnapshotPanePro
           className="self-start inline-flex items-center gap-1 text-xs text-molly-navy font-medium hover:underline"
         >
           <Archive className="w-3 h-3" />
-          Open in new tab
+          {status === "loading" ? "Open in new tab while loading…" : "Open in new tab"}
         </a>
       )}
     </div>
