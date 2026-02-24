@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
-import type { TetrisGameState } from "@/types/tetris";
+import type { TetrisGameState, ImageCrop } from "@/types/tetris";
 import { PIECES } from "@/lib/tetris/pieces";
 import { COLS, ROWS, CELL_SIZE } from "@/lib/tetris/engine";
 import { drawFrame } from "@/lib/tetris/renderer";
@@ -21,6 +21,7 @@ export function TetrisCanvas({ gameState, onSwipeLeft, onSwipeRight, onSwipeDown
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const images = useRef<Map<number, HTMLImageElement>>(new Map());
   const colorMap = useRef<Map<number, string>>(new Map());
+  const cropMap = useRef<Map<number, ImageCrop>>(new Map());
 
   // Set up DPR scaling once on mount
   useEffect(() => {
@@ -37,20 +38,19 @@ export function TetrisCanvas({ gameState, onSwipeLeft, onSwipeRight, onSwipeDown
   useEffect(() => {
     PIECES.forEach((piece) => {
       colorMap.current.set(piece.id, piece.color);
+      if (piece.imageCrop) cropMap.current.set(piece.id, piece.imageCrop);
 
       const img = new window.Image();
       img.src = piece.imageAsset;
       img.onload = () => {
         images.current.set(piece.id, img);
-        // Trigger a redraw now that this image is ready
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
-        drawFrame(ctx, gameState.board, gameState.currentPiece, images.current, colorMap.current);
+        drawFrame(ctx, gameState.board, gameState.currentPiece, images.current, colorMap.current, cropMap.current);
       };
       img.onerror = () => {
-        // Image failed — color fallback is already handled in renderer
         colorMap.current.set(piece.id, piece.color);
       };
     });
@@ -63,7 +63,7 @@ export function TetrisCanvas({ gameState, onSwipeLeft, onSwipeRight, onSwipeDown
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    drawFrame(ctx, gameState.board, gameState.currentPiece, images.current, colorMap.current);
+    drawFrame(ctx, gameState.board, gameState.currentPiece, images.current, colorMap.current, cropMap.current);
   }, [gameState]);
 
   // Touch handling

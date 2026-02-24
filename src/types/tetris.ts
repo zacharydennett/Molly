@@ -1,11 +1,19 @@
 export type Board = number[][];
 
+export interface ImageCrop {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface PieceDefinition {
   id: number;
   name: string;
   color: string;
   bgColor: string;
   imageAsset: string;
+  imageCrop?: ImageCrop;
   shapes: number[][][];
 }
 

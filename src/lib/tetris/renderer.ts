@@ -1,15 +1,30 @@
-import type { Board, ActivePiece } from "@/types/tetris";
+import type { Board, ActivePiece, ImageCrop } from "@/types/tetris";
 import { COLS, ROWS, CELL_SIZE, getShape, getGhostY } from "./engine";
 
 const GRID_COLOR = "rgba(255,255,255,0.06)";
 const BG_COLOR = "#0F172A";
+
+/** Returns the cropped source rect for an image given optional crop fractions. */
+function getCropRect(img: HTMLImageElement, crop?: ImageCrop) {
+  const t = crop?.top ?? 0;
+  const r = crop?.right ?? 0;
+  const b = crop?.bottom ?? 0;
+  const l = crop?.left ?? 0;
+  return {
+    x: l * img.naturalWidth,
+    y: t * img.naturalHeight,
+    w: img.naturalWidth * (1 - l - r),
+    h: img.naturalHeight * (1 - t - b),
+  };
+}
 
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
   board: Board,
   currentPiece: ActivePiece | null,
   images: Map<number, HTMLImageElement>,
-  colorMap: Map<number, string>
+  colorMap: Map<number, string>,
+  cropMap: Map<number, ImageCrop>
 ) {
   const width = COLS * CELL_SIZE;
   const height = ROWS * CELL_SIZE;
@@ -39,7 +54,7 @@ export function drawFrame(
     for (let col = 0; col < COLS; col++) {
       const pieceId = board[row][col];
       if (pieceId > 0) {
-        drawThumbnailCell(ctx, col, row, pieceId, images, colorMap);
+        drawThumbnailCell(ctx, col, row, pieceId, images, colorMap, cropMap);
       }
     }
   }
@@ -48,11 +63,11 @@ export function drawFrame(
   if (currentPiece) {
     const ghostY = getGhostY(board, currentPiece);
     if (ghostY !== currentPiece.y) {
-      drawPieceTiled(ctx, currentPiece, ghostY, images, colorMap, 0.3);
+      drawPieceTiled(ctx, currentPiece, ghostY, images, colorMap, cropMap, 0.3);
     }
 
     // Active falling piece — tiled product image cropped to piece shape
-    drawPieceTiled(ctx, currentPiece, currentPiece.y, images, colorMap, 1.0);
+    drawPieceTiled(ctx, currentPiece, currentPiece.y, images, colorMap, cropMap, 1.0);
   }
 }
 
@@ -66,6 +81,7 @@ function drawPieceTiled(
   overrideY: number,
   images: Map<number, HTMLImageElement>,
   colorMap: Map<number, string>,
+  cropMap: Map<number, ImageCrop>,
   alpha: number
 ) {
   const shape = getShape(piece);
@@ -86,11 +102,12 @@ function drawPieceTiled(
       if (destY + CELL_SIZE <= 0) continue; // above visible area
 
       if (img?.complete && img.naturalWidth > 0) {
-        // Crop: this cell's slice of the image based on its position in the bounding box
-        const srcX = (c / shapeCols) * img.naturalWidth;
-        const srcY = (r / shapeRows) * img.naturalHeight;
-        const srcW = img.naturalWidth / shapeCols;
-        const srcH = img.naturalHeight / shapeRows;
+        const crop = getCropRect(img, cropMap.get(piece.definition.id));
+        // Tile: this cell's slice of the cropped image based on its position in the bounding box
+        const srcX = crop.x + (c / shapeCols) * crop.w;
+        const srcY = crop.y + (r / shapeRows) * crop.h;
+        const srcW = crop.w / shapeCols;
+        const srcH = crop.h / shapeRows;
 
         ctx.drawImage(img, srcX, srcY, srcW, srcH, destX, destY, CELL_SIZE, CELL_SIZE);
       } else {
@@ -110,7 +127,7 @@ function drawPieceTiled(
 }
 
 /**
- * Draw a single locked board cell — full product image scaled to cell size.
+ * Draw a single locked board cell — full product image (cropped) scaled to cell size.
  */
 function drawThumbnailCell(
   ctx: CanvasRenderingContext2D,
@@ -118,14 +135,16 @@ function drawThumbnailCell(
   row: number,
   pieceId: number,
   images: Map<number, HTMLImageElement>,
-  colorMap: Map<number, string>
+  colorMap: Map<number, string>,
+  cropMap: Map<number, ImageCrop>
 ) {
   const x = col * CELL_SIZE;
   const y = row * CELL_SIZE;
   const img = images.get(pieceId);
 
   if (img?.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, x, y, CELL_SIZE, CELL_SIZE);
+    const crop = getCropRect(img, cropMap.get(pieceId));
+    ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, x, y, CELL_SIZE, CELL_SIZE);
     // Subtle inset border
     ctx.strokeStyle = "rgba(0,0,0,0.4)";
     ctx.lineWidth = 0.5;
@@ -148,7 +167,8 @@ export function drawNextPiece(
   pieceId: number,
   shapes: number[][][],
   images: Map<number, HTMLImageElement>,
-  colorMap: Map<number, string>
+  colorMap: Map<number, string>,
+  cropMap: Map<number, ImageCrop>
 ) {
   const shape = shapes[0];
   const shapeRows = shape.length;
@@ -173,10 +193,11 @@ export function drawNextPiece(
       const destY = (offsetY + r) * CELL_SIZE;
 
       if (img?.complete && img.naturalWidth > 0) {
-        const srcX = (c / shapeCols) * img.naturalWidth;
-        const srcY = (r / shapeRows) * img.naturalHeight;
-        const srcW = img.naturalWidth / shapeCols;
-        const srcH = img.naturalHeight / shapeRows;
+        const crop = getCropRect(img, cropMap.get(pieceId));
+        const srcX = crop.x + (c / shapeCols) * crop.w;
+        const srcY = crop.y + (r / shapeRows) * crop.h;
+        const srcW = crop.w / shapeCols;
+        const srcH = crop.h / shapeRows;
         ctx.drawImage(img, srcX, srcY, srcW, srcH, destX, destY, CELL_SIZE, CELL_SIZE);
       } else {
         ctx.fillStyle = color;

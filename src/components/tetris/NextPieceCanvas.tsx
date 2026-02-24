@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
-import type { PieceDefinition } from "@/types/tetris";
+import type { PieceDefinition, ImageCrop } from "@/types/tetris";
 import { CELL_SIZE } from "@/lib/tetris/engine";
 import { drawNextPiece } from "@/lib/tetris/renderer";
 
@@ -25,7 +25,9 @@ export function NextPieceCanvas({ piece }: Props) {
     const resolvedImg = img ?? imageRef.current;
     const images = resolvedImg ? new Map([[piece.id, resolvedImg]]) : new Map<number, HTMLImageElement>();
     const colors = new Map([[piece.id, piece.color]]);
-    drawNextPiece(ctx, piece.id, piece.shapes, images, colors);
+    const crops = new Map<number, ImageCrop>();
+    if (piece.imageCrop) crops.set(piece.id, piece.imageCrop);
+    drawNextPiece(ctx, piece.id, piece.shapes, images, colors, crops);
   };
 
   // Set up DPR scaling once on mount
