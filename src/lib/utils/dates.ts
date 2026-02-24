@@ -1,4 +1,4 @@
-import { format, subWeeks, startOfWeek, endOfWeek, subYears } from "date-fns";
+import { format, subWeeks, startOfWeek, endOfWeek, subYears, subDays } from "date-fns";
 
 /** Returns Mon of the current or most recent completed week */
 export function getLastMondayDate(): Date {
@@ -82,6 +82,34 @@ export function getCurrentEpiweeks(): {
     lastWeek: toEpiweek(lastWeekDate),
     sameWeekLastYear: toEpiweek(prevYearDate),
   };
+}
+
+/** Returns the Wednesday of the most recently completed week at noon UTC. */
+export function getPrevWeekWednesday(): Date {
+  const today = new Date();
+  const dow = today.getDay(); // 0=Sun 1=Mon … 6=Sat
+  // Days back to this week's Monday (Mon=0 offset)
+  const daysToThisMonday = dow === 0 ? 6 : dow - 1;
+  // Previous week's Monday
+  const prevMonday = subDays(today, daysToThisMonday + 7);
+  // Wednesday = Monday + 2
+  const prevWed = new Date(prevMonday);
+  prevWed.setDate(prevMonday.getDate() + 2);
+  prevWed.setHours(12, 0, 0, 0);
+  return prevWed;
+}
+
+/** Returns the Wednesday of the same week one year ago (52 weeks back, keeps day-of-week). */
+export function getLastYearWednesday(): Date {
+  const prevWed = getPrevWeekWednesday();
+  const lastYear = subDays(prevWed, 364); // 52 weeks keeps same weekday
+  lastYear.setHours(12, 0, 0, 0);
+  return lastYear;
+}
+
+/** Converts a Date to Wayback Machine timestamp format: YYYYMMDDHHmmss */
+export function toWaybackTimestamp(date: Date): string {
+  return format(date, "yyyyMMddHHmmss");
 }
 
 export function formatWaybackTimestamp(ts: string): string {

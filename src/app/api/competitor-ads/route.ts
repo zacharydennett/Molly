@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
-import { formatWaybackTimestamp } from "@/lib/utils/dates";
-import type { CompetitorAdsApiResponse, RetailerAdData } from "@/types/competitor-ads";
-
-const CDX_BASE = "http://web.archive.org/cdx/search/cdx";
+import { format } from "date-fns";
+import {
+  formatWaybackTimestamp,
+  getPrevWeekWednesday,
+  getLastYearWednesday,
+  toWaybackTimestamp,
+} from "@/lib/utils/dates";
+import type { CompetitorAdsApiResponse, RetailerAdData, RetailerSnapshot } from "@/types/competitor-ads";
 
 const RETAILERS = [
   {
@@ -10,101 +14,120 @@ const RETAILERS = [
     name: "CVS Pharmacy",
     shortName: "CVS",
     color: "#CC0000",
-    url: "cvs.com/weeklyad/",
-    directUrl: "https://www.cvs.com/weeklyad/",
-  },
-  {
-    id: "walmart",
-    name: "Walmart",
-    shortName: "Walmart",
-    color: "#0071CE",
-    url: "walmart.com/shop/weekly-ad",
-    directUrl: "https://www.walmart.com/shop/weekly-ad",
+    url: "www.cvs.com/shop",
+    directUrl: "https://www.cvs.com/shop",
   },
   {
     id: "walgreens",
     name: "Walgreens",
     shortName: "Walgreens",
     color: "#E31837",
-    url: "walgreens.com/offers/offers.jsp",
-    directUrl: "https://www.walgreens.com/offers/offers.jsp?view=weeklyad",
+    url: "www.walgreens.com",
+    directUrl: "https://www.walgreens.com",
+  },
+  {
+    id: "walmart",
+    name: "Walmart",
+    shortName: "Walmart",
+    color: "#0071CE",
+    url: "www.walmart.com",
+    directUrl: "https://www.walmart.com",
   },
   {
     id: "costco",
     name: "Costco",
     shortName: "Costco",
     color: "#005DAA",
-    url: "costco.com/hot-buys.html",
-    directUrl: "https://www.costco.com/hot-buys.html",
+    url: "www.costco.com",
+    directUrl: "https://www.costco.com",
   },
   {
     id: "kroger",
     name: "Kroger",
     shortName: "Kroger",
-    color: "#005DAA",
-    url: "kroger.com/weeklyad",
-    directUrl: "https://www.kroger.com/weeklyad",
+    color: "#1F5FA6",
+    url: "www.kroger.com",
+    directUrl: "https://www.kroger.com",
   },
 ];
 
-async function getLatestSnapshot(
-  targetUrl: string
-): Promise<{ archiveUrl: string | null; timestamp: string | null; error: string | null }> {
-  const params = new URLSearchParams({
-    url: targetUrl,
-    limit: "-5",
-    filter: "statuscode:200",
-    output: "json",
-    fl: "timestamp,original,statuscode",
-    collapse: "timestamp:8",
-  });
+async function getWaybackSnapshot(
+  url: string,
+  targetDate: Date,
+  label: string
+): Promise<RetailerSnapshot> {
+  const ts = toWaybackTimestamp(targetDate);
+  const apiUrl = `https://archive.org/wayback/available?url=${encodeURIComponent(url)}&timestamp=${ts}`;
 
   try {
-    const res = await fetch(`${CDX_BASE}?${params}`, {
-      next: { revalidate: 14400 }, // 4 hours
-    });
-    if (!res.ok) throw new Error(`CDX API ${res.status}`);
+    const res = await fetch(apiUrl, { next: { revalidate: 86400 } });
+    if (!res.ok) throw new Error(`Wayback API ${res.status}`);
 
-    const rows: string[][] = await res.json();
-    if (!rows || rows.length < 2) return { archiveUrl: null, timestamp: null, error: null };
+    const data = await res.json();
+    const closest = data?.archived_snapshots?.closest;
 
-    // Skip header row (rows[0]), get most recent (last row)
-    const lastRow = rows[rows.length - 1];
-    const [timestamp, original] = lastRow;
+    if (!closest?.available) {
+      return { archiveUrl: null, timestamp: null, date: null, label, error: null };
+    }
+
+    // Normalize to https
+    const archiveUrl = (closest.url as string).replace(
+      "http://web.archive.org",
+      "https://web.archive.org"
+    );
 
     return {
-      archiveUrl: `https://web.archive.org/web/${timestamp}/${original}`,
-      timestamp,
+      archiveUrl,
+      timestamp: closest.timestamp,
+      date: formatWaybackTimestamp(closest.timestamp),
+      label,
       error: null,
     };
   } catch (e) {
     return {
       archiveUrl: null,
       timestamp: null,
-      error: e instanceof Error ? e.message : "CDX lookup failed",
+      date: null,
+      label,
+      error: e instanceof Error ? e.message : "Wayback lookup failed",
     };
   }
 }
 
 export async function GET() {
+  const prevWed = getPrevWeekWednesday();
+  const lastYearWed = getLastYearWednesday();
+
+  const prevWeekLabel = format(prevWed, "MMM d, yyyy");
+  const lastYearLabel = format(lastYearWed, "MMM d, yyyy");
+
+  // Fetch both snapshots for all 5 retailers in parallel (10 total requests)
   const results = await Promise.allSettled(
     RETAILERS.map(async (retailer) => {
-      const snap = await getLatestSnapshot(retailer.url);
+      const [prevSnap, lastYearSnap] = await Promise.all([
+        getWaybackSnapshot(retailer.url, prevWed, prevWeekLabel),
+        getWaybackSnapshot(retailer.url, lastYearWed, lastYearLabel),
+      ]);
       const result: RetailerAdData = {
         id: retailer.id,
         name: retailer.name,
         shortName: retailer.shortName,
         color: retailer.color,
-        archiveUrl: snap.archiveUrl,
-        snapshotTimestamp: snap.timestamp,
-        snapshotDate: snap.timestamp ? formatWaybackTimestamp(snap.timestamp) : null,
-        originalUrl: retailer.url,
+        prevWeek: prevSnap,
+        lastYear: lastYearSnap,
         directUrl: retailer.directUrl,
-        error: snap.error,
       };
       return result;
     })
   );
+
+  const noSnap = (label: string): RetailerSnapshot => ({
+    archiveUrl: null,
+    timestamp: null,
+    date: null,
+    label,
+    error: "Request failed",
+  });
 
   const retailers: RetailerAdData[] = results.map((r, i) => {
     if (r.status === "fulfilled") return r.value;
@@ -113,21 +136,20 @@ export async function GET() {
       name: RETAILERS[i].name,
       shortName: RETAILERS[i].shortName,
       color: RETAILERS[i].color,
-      archiveUrl: null,
-      snapshotTimestamp: null,
-      snapshotDate: null,
-      originalUrl: RETAILERS[i].url,
+      prevWeek: noSnap(prevWeekLabel),
+      lastYear: noSnap(lastYearLabel),
       directUrl: RETAILERS[i].directUrl,
-      error: "Request failed",
     };
   });
 
   const response: CompetitorAdsApiResponse = {
     generatedAt: new Date().toISOString(),
+    prevWeekLabel,
+    lastYearLabel,
     retailers,
   };
 
   return NextResponse.json(response, {
-    headers: { "Cache-Control": "s-maxage=14400, stale-while-revalidate=86400" },
+    headers: { "Cache-Control": "s-maxage=86400, stale-while-revalidate=86400" },
   });
 }

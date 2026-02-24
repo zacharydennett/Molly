@@ -1,17 +1,24 @@
+export interface RetailerSnapshot {
+  archiveUrl: string | null;
+  timestamp: string | null;
+  date: string | null;
+  label: string;
+  error: string | null;
+}
+
 export interface RetailerAdData {
   id: string;
   name: string;
   shortName: string;
   color: string;
-  archiveUrl: string | null;
-  snapshotTimestamp: string | null;
-  snapshotDate: string | null;
-  originalUrl: string;
+  prevWeek: RetailerSnapshot;
+  lastYear: RetailerSnapshot;
   directUrl: string;
-  error: string | null;
 }
 
 export interface CompetitorAdsApiResponse {
   generatedAt: string;
+  prevWeekLabel: string;
+  lastYearLabel: string;
   retailers: RetailerAdData[];
 }
