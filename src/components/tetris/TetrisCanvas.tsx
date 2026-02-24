@@ -97,7 +97,6 @@ export function TetrisCanvas({ gameState, onSwipeLeft, onSwipeRight, onSwipeDown
       ref={canvasRef}
       style={{
         width: LOGICAL_W,
-        height: LOGICAL_H,
         maxWidth: "100%",
         height: "auto",
         touchAction: "none",

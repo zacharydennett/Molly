@@ -64,7 +64,6 @@ export function NextPieceCanvas({ piece }: Props) {
       ref={canvasRef}
       style={{
         width: LOGICAL_W,
-        height: LOGICAL_H,
         maxWidth: "100%",
         height: "auto",
         display: "block",
