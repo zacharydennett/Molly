@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   // Validate
   if (
     typeof player_name !== "string" ||
-    !/^[A-Za-z0-9 ]{1,3}$/.test(player_name.trim()) ||
+    !/^[A-Za-z]{1,20} [A-Za-z]$/.test(player_name.trim()) ||
     typeof score !== "number" ||
     score < 0 ||
     score > 9999999 ||
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from("tetris_scores")
     .insert({
-      player_name: player_name.trim().toUpperCase().slice(0, 3),
+      player_name: player_name.trim(),
       score: Math.round(score),
       level: Math.round(level),
       lines: Math.round(lines),

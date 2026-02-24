@@ -74,7 +74,7 @@ export function TetrisGame() {
             {state.status === "idle" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 rounded-lg gap-4">
                 <div className="text-center text-white">
-                  <p className="text-2xl font-black text-molly-amber mb-1">🎮 MOLLY BLOCKS</p>
+                  <p className="text-2xl font-black text-molly-amber mb-1">🎮 POG PROCESS</p>
                   <p className="text-sm opacity-70">Health &amp; Wellness Edition</p>
                 </div>
                 <button

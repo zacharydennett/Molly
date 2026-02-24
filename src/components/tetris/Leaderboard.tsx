@@ -55,7 +55,7 @@ export function Leaderboard({ highlightScore }: Props) {
                 >
                   {i + 1}
                 </span>
-                <span className="font-mono font-bold text-molly-ink w-10 uppercase">
+                <span className="font-semibold text-molly-ink flex-1 truncate text-left">
                   {s.player_name}
                 </span>
                 <span className="flex-1 text-right font-mono text-xs text-molly-slate">

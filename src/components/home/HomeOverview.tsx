@@ -168,12 +168,12 @@ export function HomeOverview() {
                 <div className="bg-amber-100 rounded-lg p-1.5">
                   <Gamepad2 className="w-4 h-4 text-amber-600" />
                 </div>
-                <span className="font-semibold text-sm text-molly-ink">Molly Blocks</span>
+                <span className="font-semibold text-sm text-molly-ink">POG Process</span>
               </div>
               <ArrowRight className="w-4 h-4 text-molly-slate group-hover:text-amber-500 transition-colors" />
             </div>
             <div className="space-y-2">
-              <p className="text-xs text-molly-slate">Health &amp; Wellness Tetris</p>
+              <p className="text-xs text-molly-slate">Health &amp; Wellness Product Game</p>
               {/* Mini leaderboard preview */}
               <div className="space-y-1">
                 <div className="flex items-center gap-1 text-xs text-molly-amber font-semibold">

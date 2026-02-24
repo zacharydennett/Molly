@@ -10,10 +10,10 @@ export function TetrisPageClient() {
       <div>
         <h1 className="text-2xl font-bold text-molly-navy flex items-center gap-2">
           <Gamepad2 className="w-6 h-6 text-molly-red" />
-          Molly Blocks — Health &amp; Wellness Edition
+          POG Process — Health &amp; Wellness Edition
         </h1>
         <p className="text-sm text-molly-slate mt-1">
-          Tetris with real product packaging. High scores are shared across all players!
+          Match real product packaging pieces. High scores are shared across all players!
         </p>
       </div>
 

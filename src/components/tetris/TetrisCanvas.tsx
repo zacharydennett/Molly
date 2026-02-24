@@ -14,11 +14,24 @@ interface Props {
   onTap?: () => void;
 }
 
+const LOGICAL_W = COLS * CELL_SIZE;
+const LOGICAL_H = ROWS * CELL_SIZE;
+
 export function TetrisCanvas({ gameState, onSwipeLeft, onSwipeRight, onSwipeDown, onTap }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const images = useRef<Map<number, HTMLImageElement>>(new Map());
   const colorMap = useRef<Map<number, string>>(new Map());
-  const imagesLoadedRef = useRef(0);
+
+  // Set up DPR scaling once on mount
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = LOGICAL_W * dpr;
+    canvas.height = LOGICAL_H * dpr;
+    const ctx = canvas.getContext("2d");
+    if (ctx) ctx.scale(dpr, dpr);
+  }, []);
 
   // Pre-load all product images; redraw canvas once each loads
   useEffect(() => {
@@ -29,7 +42,6 @@ export function TetrisCanvas({ gameState, onSwipeLeft, onSwipeRight, onSwipeDown
       img.src = piece.imageAsset;
       img.onload = () => {
         images.current.set(piece.id, img);
-        imagesLoadedRef.current += 1;
         // Trigger a redraw now that this image is ready
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -83,10 +95,17 @@ export function TetrisCanvas({ gameState, onSwipeLeft, onSwipeRight, onSwipeDown
   return (
     <canvas
       ref={canvasRef}
-      width={COLS * CELL_SIZE}
-      height={ROWS * CELL_SIZE}
-      className="rounded-lg border-2 border-slate-700 shadow-xl cursor-pointer"
-      style={{ maxWidth: "100%", height: "auto", touchAction: "none" }}
+      style={{
+        width: LOGICAL_W,
+        height: LOGICAL_H,
+        maxWidth: "100%",
+        height: "auto",
+        touchAction: "none",
+        borderRadius: "0.5rem",
+        border: "2px solid #334155",
+        boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+        cursor: "pointer",
+      }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     />

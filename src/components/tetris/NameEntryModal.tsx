@@ -13,20 +13,27 @@ interface Props {
 }
 
 export function NameEntryModal({ score, level, lines, onSubmit, onSkip }: Props) {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastInitial, setLastInitial] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleaned = name.trim().toUpperCase().slice(0, 3);
-    if (!cleaned || !/^[A-Z0-9 ]{1,3}$/.test(cleaned)) {
-      setError("Enter 1–3 letters or numbers");
+    const fn = firstName.trim();
+    const li = lastInitial.trim().toUpperCase();
+    if (!fn || !/^[A-Za-z]{1,20}$/.test(fn)) {
+      setError("Enter a valid first name (letters only)");
       return;
     }
+    if (!li || !/^[A-Z]$/.test(li)) {
+      setError("Enter a single letter for your last initial");
+      return;
+    }
+    const combined = `${fn} ${li}`;
     setSubmitting(true);
     try {
-      await onSubmit(cleaned);
+      await onSubmit(combined);
     } catch {
       setError("Failed to save. Try again.");
       setSubmitting(false);
@@ -50,25 +57,51 @@ export function NameEntryModal({ score, level, lines, onSubmit, onSkip }: Props)
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <label className="block text-sm font-semibold text-molly-ink">
-            Enter your initials (3 chars)
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value.toUpperCase().slice(0, 3));
-              setError("");
-            }}
-            maxLength={3}
-            autoFocus
-            placeholder="AAA"
-            className="w-full text-center text-3xl font-black font-mono tracking-[0.5em] border-2 border-slate-200 rounded-xl py-3 focus:border-molly-navy focus:outline-none uppercase"
-          />
+          <div className="text-left space-y-2">
+            <div>
+              <label className="block text-xs font-semibold text-molly-slate mb-1 uppercase tracking-wide">
+                First Name
+              </label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => {
+                  setFirstName(e.target.value.replace(/[^A-Za-z]/g, "").slice(0, 20));
+                  setError("");
+                }}
+                maxLength={20}
+                autoFocus
+                placeholder="e.g. Zachary"
+                className="w-full text-lg font-semibold border-2 border-slate-200 rounded-xl px-4 py-2.5 focus:border-molly-navy focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-molly-slate mb-1 uppercase tracking-wide">
+                Last Initial
+              </label>
+              <input
+                type="text"
+                value={lastInitial}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^A-Za-z]/g, "").slice(0, 1).toUpperCase();
+                  setLastInitial(val);
+                  setError("");
+                }}
+                maxLength={1}
+                placeholder="D"
+                className="w-20 text-center text-xl font-black font-mono border-2 border-slate-200 rounded-xl py-2.5 focus:border-molly-navy focus:outline-none uppercase"
+              />
+            </div>
+          </div>
+          {firstName && lastInitial && (
+            <p className="text-sm text-molly-slate">
+              Saving as: <span className="font-bold text-molly-ink">{firstName.trim()} {lastInitial.toUpperCase()}</span>
+            </p>
+          )}
           {error && <p className="text-xs text-red-500">{error}</p>}
           <button
             type="submit"
-            disabled={submitting || !name.trim()}
+            disabled={submitting || !firstName.trim() || !lastInitial.trim()}
             className="w-full py-3 bg-molly-navy text-white font-bold rounded-xl hover:bg-molly-navy-light transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {submitting ? (

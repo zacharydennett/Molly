@@ -2,7 +2,7 @@ import type { Board, ActivePiece, PieceDefinition } from "@/types/tetris";
 
 export const COLS = 10;
 export const ROWS = 20;
-export const CELL_SIZE = 30;
+export const CELL_SIZE = 40;
 
 export function createEmptyBoard(): Board {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));

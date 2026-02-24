@@ -10,7 +10,7 @@ const TABS = [
   { href: "/weather", label: "Weather", icon: CloudSun },
   { href: "/illness", label: "Illness", icon: Activity },
   { href: "/competitor-ads", label: "Competitor Ads", icon: ShoppingCart },
-  { href: "/tetris", label: "Tetris", icon: Gamepad2 },
+  { href: "/tetris", label: "POG Process", icon: Gamepad2 },
 ];
 
 export function TabBar() {

@@ -9,57 +9,68 @@ interface Props {
   piece: PieceDefinition;
 }
 
+const LOGICAL_W = 5 * CELL_SIZE;
+const LOGICAL_H = 4 * CELL_SIZE;
+
 export function NextPieceCanvas({ piece }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const dprSetup = useRef(false);
+
+  const redraw = (img?: HTMLImageElement | null) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const resolvedImg = img ?? imageRef.current;
+    const images = resolvedImg ? new Map([[piece.id, resolvedImg]]) : new Map<number, HTMLImageElement>();
+    const colors = new Map([[piece.id, piece.color]]);
+    drawNextPiece(ctx, piece.id, piece.shapes, images, colors);
+  };
+
+  // Set up DPR scaling once on mount
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || dprSetup.current) return;
+    dprSetup.current = true;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = LOGICAL_W * dpr;
+    canvas.height = LOGICAL_H * dpr;
+    const ctx = canvas.getContext("2d");
+    if (ctx) ctx.scale(dpr, dpr);
+  }, []);
 
   useEffect(() => {
     const img = new window.Image();
     img.src = piece.imageAsset;
 
-    const draw = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      const images = new Map([[piece.id, img]]);
-      const colors = new Map([[piece.id, piece.color]]);
-      drawNextPiece(ctx, piece.id, piece.shapes, images, colors);
-    };
-
     if (img.complete) {
       imageRef.current = img;
-      draw();
+      redraw(img);
     } else {
       img.onload = () => {
         imageRef.current = img;
-        draw();
+        redraw(img);
       };
     }
 
-    // Also draw immediately with whatever we have (color fallback)
-    draw();
-  }, [piece]);
-
-  // Redraw when piece changes
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const img = imageRef.current;
-    const images = img ? new Map([[piece.id, img]]) : new Map<number, HTMLImageElement>();
-    const colors = new Map([[piece.id, piece.color]]);
-    drawNextPiece(ctx, piece.id, piece.shapes, images, colors);
+    // Also draw immediately with color fallback
+    redraw();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [piece]);
 
   return (
     <canvas
       ref={canvasRef}
-      width={5 * CELL_SIZE}
-      height={4 * CELL_SIZE}
-      className="rounded mx-auto block"
-      style={{ maxWidth: "100%", height: "auto" }}
+      style={{
+        width: LOGICAL_W,
+        height: LOGICAL_H,
+        maxWidth: "100%",
+        height: "auto",
+        display: "block",
+        margin: "0 auto",
+        borderRadius: "0.25rem",
+      }}
     />
   );
 }

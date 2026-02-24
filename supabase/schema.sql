@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================================
 CREATE TABLE IF NOT EXISTS tetris_scores (
   id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-  player_name VARCHAR(3)   NOT NULL CHECK (length(trim(player_name)) BETWEEN 1 AND 3),
+  player_name VARCHAR(25)  NOT NULL CHECK (length(trim(player_name)) BETWEEN 3 AND 25),
   score       INTEGER      NOT NULL CHECK (score >= 0),
   level       INTEGER      NOT NULL DEFAULT 1 CHECK (level >= 1),
   lines       INTEGER      NOT NULL DEFAULT 0 CHECK (lines >= 0),
@@ -28,6 +28,14 @@ CREATE POLICY "public_read_scores"
 CREATE POLICY "public_insert_scores"
   ON tetris_scores FOR INSERT
   WITH CHECK (true);
+
+-- ============================================================
+-- MIGRATION: Widen player_name for first name + last initial
+-- Run this if the table was already created with VARCHAR(3):
+-- ============================================================
+-- ALTER TABLE tetris_scores ALTER COLUMN player_name TYPE VARCHAR(25);
+-- ALTER TABLE tetris_scores DROP CONSTRAINT IF EXISTS tetris_scores_player_name_check;
+-- ALTER TABLE tetris_scores ADD CONSTRAINT tetris_scores_player_name_check CHECK (length(trim(player_name)) BETWEEN 3 AND 25);
 
 -- ============================================================
 -- VERIFY
