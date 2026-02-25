@@ -11,17 +11,32 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Activity, TrendingUp, TrendingDown, Minus, Info, Droplets } from "lucide-react";
 import type { IllnessLevel, Trend } from "@/types/illness";
 
-const LEVEL_BADGE: Record<IllnessLevel, { label: string; variant: "green" | "amber" | "orange" | "red" | "slate" }> = {
-  minimal: { label: "Minimal", variant: "green" },
-  low: { label: "Low", variant: "green" },
-  moderate: { label: "Moderate", variant: "amber" },
-  high: { label: "High", variant: "orange" },
-  very_high: { label: "Very High", variant: "red" },
-  unknown: { label: "Unknown", variant: "slate" },
+const FLU_LEVEL_BADGE: Record<
+  IllnessLevel,
+  { label: string; variant: "green" | "amber" | "orange" | "red" | "slate" }
+> = {
+  minimal:  { label: "Minimal",   variant: "green"  },
+  low:      { label: "Low",       variant: "green"  },
+  moderate: { label: "Moderate",  variant: "amber"  },
+  high:     { label: "High",      variant: "orange" },
+  very_high:{ label: "Very High", variant: "red"    },
+  unknown:  { label: "Unknown",   variant: "slate"  },
+};
+
+const WW_LEVEL_BADGE: Record<
+  IllnessLevel,
+  { label: string; variant: "green" | "amber" | "orange" | "red" | "slate" }
+> = {
+  minimal:  { label: "Very Low",  variant: "green"  },
+  low:      { label: "Low",       variant: "green"  },
+  moderate: { label: "Moderate",  variant: "amber"  },
+  high:     { label: "High",      variant: "orange" },
+  very_high:{ label: "Very High", variant: "red"    },
+  unknown:  { label: "Unknown",   variant: "slate"  },
 };
 
 function TrendIcon({ trend }: { trend: Trend }) {
-  if (trend === "rising") return <TrendingUp className="w-4 h-4 text-red-500" />;
+  if (trend === "rising")  return <TrendingUp  className="w-4 h-4 text-red-500"   />;
   if (trend === "falling") return <TrendingDown className="w-4 h-4 text-green-500" />;
   return <Minus className="w-4 h-4 text-slate-400" />;
 }
@@ -34,9 +49,14 @@ export function IllnessDashboard() {
     return <ErrorBanner message="Could not load illness data." onRetry={() => refetch()} />;
 
   const { flu, wastewater } = data;
-  const fluLevelInfo = LEVEL_BADGE[flu.nationalLevel];
-  const wwLevelInfo = LEVEL_BADGE[wastewater.level];
-  const wwCurrent = wastewater.thisWeek ?? wastewater.lastWeek;
+  const fluLevelInfo = FLU_LEVEL_BADGE[flu.nationalLevel];
+  const wwLevelInfo  = WW_LEVEL_BADGE[wastewater.level];
+
+  // Previous week WVAL from trend series (second-to-last point)
+  const wwPrevWeek =
+    wastewater.trendSeries.length >= 2
+      ? wastewater.trendSeries[wastewater.trendSeries.length - 2]
+      : null;
 
   return (
     <div className="space-y-6">
@@ -48,7 +68,7 @@ export function IllnessDashboard() {
             Nationwide Illness Levels
           </h1>
           <p className="text-sm text-molly-slate mt-1">
-            Flu ILI% (CDC FluView) · COVID wastewater detection (CDC NWSS)
+            Flu ILI% (CDC FluView) · COVID wastewater activity (CDC NWSS)
           </p>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-molly-slate bg-slate-100 rounded-lg px-3 py-1.5">
@@ -96,7 +116,7 @@ export function IllnessDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-1.5">
               <Droplets className="w-4 h-4 text-blue-500" />
-              COVID Wastewater Detection
+              COVID Wastewater Activity
             </CardTitle>
             <div className="flex items-center gap-2">
               <TrendIcon trend={wastewater.trend} />
@@ -109,30 +129,27 @@ export function IllnessDashboard() {
           <WastewaterTrendChart wastewater={wastewater} />
           <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs border-t border-slate-100 pt-3">
             {[
-              { label: "This Week", value: wwCurrent?.detectProp },
-              { label: "Prev Week", value: wastewater.lastWeek?.detectProp },
-              { label: "Last Year", value: wastewater.sameWeekLastYear?.detectProp },
+              { label: "Current WVAL", value: wastewater.current?.national },
+              { label: "Prev Week",    value: wwPrevWeek?.national },
+              { label: "Last Year",    value: wastewater.current?.nationalLY },
             ].map(({ label, value }) => (
               <div key={label}>
                 <div className="font-bold text-molly-ink text-sm font-mono">
-                  {value != null ? `${value}%` : "—"}
+                  {value != null ? value.toFixed(1) : "—"}
                 </div>
                 <div className="text-molly-slate">{label}</div>
               </div>
             ))}
           </div>
-          {wwCurrent && (
+          {wastewater.current && (
             <p className="text-xs text-molly-slate text-center mt-2">
-              {wwCurrent.sitesReporting.toLocaleString()} sites reporting ·{" "}
-              {wwCurrent.avgPercentile != null
-                ? `${wwCurrent.avgPercentile}th percentile vs. historical`
-                : "percentile unavailable"}
+              Week ending {wastewater.current.weekLabel} · CDC NWSS
             </p>
           )}
         </Card>
       </div>
 
-      {/* Comparison chart */}
+      {/* Full 12-week comparison chart */}
       <IllnessComparisonChart flu={flu} wastewater={wastewater} />
 
       {/* Legend cards */}
@@ -143,11 +160,11 @@ export function IllnessDashboard() {
           </p>
           <div className="flex flex-wrap gap-2">
             {[
-              { label: "Minimal", range: "< 2.5%", color: "bg-green-100 text-green-700" },
-              { label: "Low", range: "2.5–5%", color: "bg-green-200 text-green-800" },
-              { label: "Moderate", range: "5–7.5%", color: "bg-amber-100 text-amber-700" },
-              { label: "High", range: "7.5–10%", color: "bg-orange-100 text-orange-700" },
-              { label: "Very High", range: "> 10%", color: "bg-red-100 text-red-700" },
+              { label: "Minimal", range: "< 2.5%",   color: "bg-green-100 text-green-700"  },
+              { label: "Low",     range: "2.5–5%",   color: "bg-green-200 text-green-800"  },
+              { label: "Moderate",range: "5–7.5%",   color: "bg-amber-100 text-amber-700"  },
+              { label: "High",    range: "7.5–10%",  color: "bg-orange-100 text-orange-700"},
+              { label: "Very High",range: "> 10%",   color: "bg-red-100 text-red-700"      },
             ].map(({ label, range, color }) => (
               <div key={label} className={`${color} px-2 py-1 rounded text-xs font-medium`}>
                 {label} <span className="opacity-70">({range})</span>
@@ -158,15 +175,15 @@ export function IllnessDashboard() {
 
         <Card className="p-3">
           <p className="text-xs font-semibold text-molly-slate mb-2 uppercase tracking-wide">
-            Wastewater Level (Percentile vs. Historical)
+            WVAL Scale (CDC NWSS)
           </p>
           <div className="flex flex-wrap gap-2">
             {[
-              { label: "Minimal", range: "< 10th", color: "bg-green-100 text-green-700" },
-              { label: "Low", range: "10–25th", color: "bg-green-200 text-green-800" },
-              { label: "Moderate", range: "25–50th", color: "bg-amber-100 text-amber-700" },
-              { label: "High", range: "50–75th", color: "bg-orange-100 text-orange-700" },
-              { label: "Very High", range: "> 75th", color: "bg-red-100 text-red-700" },
+              { label: "Very Low",  range: "≤ 2.0",    color: "bg-green-100 text-green-700"  },
+              { label: "Low",       range: "2.0–3.4",  color: "bg-lime-100 text-lime-700"    },
+              { label: "Moderate",  range: "3.4–5.3",  color: "bg-amber-100 text-amber-700"  },
+              { label: "High",      range: "5.3–7.8",  color: "bg-orange-100 text-orange-700"},
+              { label: "Very High", range: "> 7.8",    color: "bg-red-100 text-red-700"      },
             ].map(({ label, range, color }) => (
               <div key={label} className={`${color} px-2 py-1 rounded text-xs font-medium`}>
                 {label} <span className="opacity-70">({range})</span>

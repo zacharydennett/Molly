@@ -3,14 +3,15 @@ import { getCurrentEpiweeks } from "@/lib/utils/dates";
 import type {
   IllnessApiResponse,
   FluDataPoint,
-  WastewaterDataPoint,
+  WastewaterWVAL,
   IllnessLevel,
   Trend,
 } from "@/types/illness";
-import { format, subDays, addDays, subWeeks, subYears } from "date-fns";
+import { format } from "date-fns";
 
 const DELPHI_FLU_URL = "https://api.delphi.cmu.edu/epidata/fluview/";
-const NWSS_URL = "https://data.cdc.gov/resource/2ew6-ywp6.json";
+const NWSS_CSV_URL =
+  "https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/sc2/nwsssc2regionalactivitylevelDL.csv";
 
 function getFluLevel(wili: number): IllnessLevel {
   if (wili < 2.5) return "minimal";
@@ -20,16 +21,20 @@ function getFluLevel(wili: number): IllnessLevel {
   return "very_high";
 }
 
-function getWastewaterLevel(percentile: number | null): IllnessLevel {
-  if (percentile == null) return "unknown";
-  if (percentile < 10) return "minimal";
-  if (percentile < 25) return "low";
-  if (percentile < 50) return "moderate";
-  if (percentile < 75) return "high";
+// CDC WVAL thresholds: Very Low ≤2, Low 2–3.4, Moderate 3.4–5.3, High 5.3–7.8, Very High >7.8
+function getWastewaterLevel(wval: number | null): IllnessLevel {
+  if (wval == null) return "unknown";
+  if (wval <= 2) return "minimal";
+  if (wval <= 3.4) return "low";
+  if (wval <= 5.3) return "moderate";
+  if (wval <= 7.8) return "high";
   return "very_high";
 }
 
-function getTrend(current: number | null | undefined, previous: number | null | undefined): Trend {
+function getTrend(
+  current: number | null | undefined,
+  previous: number | null | undefined
+): Trend {
   if (current == null || previous == null) return "unknown";
   const diff = current - previous;
   if (Math.abs(diff) < 0.5) return "stable";
@@ -94,82 +99,119 @@ async function fetchFluData(): Promise<{
   }
 }
 
-// ─── Wastewater (CDC NWSS) ───────────────────────────────────────────────────
+// ─── Wastewater (CDC NWSS WVAL CSV) ──────────────────────────────────────────
 
-interface NwssAggRow {
-  date_end: string;
-  avg_percentile: string;
-  avg_detect_prop: string;
-  site_count: string;
+interface NwssRawRow {
+  weekEnding: string;
+  national: number | null;
+  midwest: number | null;
+  northeast: number | null;
+  south: number | null;
+  west: number | null;
 }
 
-async function fetchNwssAggregated(fromDate: string, toDate: string | null): Promise<NwssAggRow[]> {
-  const whereClause = toDate
-    ? `date_end >= '${fromDate}T00:00:00.000' AND date_end <= '${toDate}T23:59:59.000'`
-    : `date_end >= '${fromDate}T00:00:00.000'`;
+function parseNwssCsv(text: string): NwssRawRow[] {
+  const lines = text.trim().split("\n");
+  if (lines.length < 2) return [];
 
-  const params = new URLSearchParams({
-    $select: "date_end,avg(percentile) as avg_percentile,avg(detect_prop_15d) as avg_detect_prop,count(*) as site_count",
-    $where: whereClause,
-    $group: "date_end",
-    $order: "date_end DESC",
-    $limit: "15",
-  });
+  // Strip surrounding quotes and \r from a cell value
+  const clean = (s: string) => s.trim().replace(/\r/g, "").replace(/^"|"$/g, "");
 
-  const res = await fetch(`${NWSS_URL}?${params}`, { next: { revalidate: 43200 } });
-  if (!res.ok) throw new Error(`NWSS API ${res.status}`);
-  return res.json();
-}
+  const headers = lines[0].split(",").map(clean);
 
-function makeWastewaterPoint(row: NwssAggRow): WastewaterDataPoint {
-  const dateStr = row.date_end.split("T")[0]; // "2026-02-14"
-  const d = new Date(`${dateStr}T12:00:00Z`);
-  const avgPct = row.avg_percentile ? parseFloat(row.avg_percentile) : null;
-  const detectRaw = row.avg_detect_prop ? parseFloat(row.avg_detect_prop) : null;
-  return {
-    weekEnding: dateStr,
-    weekLabel: `Week of ${format(d, "MMM d")}`,
-    sitesReporting: parseInt(row.site_count, 10) || 0,
-    avgPercentile: avgPct != null ? Math.round(avgPct) : null,
-    // detect_prop_15d is a 0–1 proportion; convert to 0–100 percentage
-    detectProp: detectRaw != null ? Math.round(detectRaw * 100) : null,
+  const parseVal = (s: string | undefined): number | null => {
+    if (!s || s === "" || s.toLowerCase() === "na") return null;
+    const n = parseFloat(s);
+    return isNaN(n) ? null : Math.round(n * 100) / 100;
   };
+
+  const rows = lines
+    .slice(1)
+    .map((line) => {
+      const vals = line.split(",").map(clean);
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => {
+        obj[h] = vals[i] ?? "";
+      });
+      return {
+        weekEnding: obj["Week_Ending_Date"] ?? "",
+        national: parseVal(obj["National_WVAL"]),
+        midwest: parseVal(obj["Midwest_WVAL"]),
+        northeast: parseVal(obj["Northeast_WVAL"]),
+        south: parseVal(obj["South_WVAL"]),
+        west: parseVal(obj["West_WVAL"]),
+      };
+    })
+    .filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.weekEnding));
+
+  // Deduplicate — keep one row per date (CSV has duplicate date entries)
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    if (seen.has(r.weekEnding)) return false;
+    seen.add(r.weekEnding);
+    return true;
+  });
 }
 
 async function fetchWastewaterData(): Promise<{
-  thisWeek: WastewaterDataPoint | null;
-  lastWeek: WastewaterDataPoint | null;
-  sameWeekLastYear: WastewaterDataPoint | null;
-  trendSeries: WastewaterDataPoint[];
+  current: WastewaterWVAL | null;
+  trendSeries: WastewaterWVAL[];
   error: string | null;
 }> {
-  const now = new Date();
-  // Fetch ~13 weeks for the trend (91 days); newest-first from API
-  const trendFrom = format(subDays(now, 91), "yyyy-MM-dd");
-  // Same-week-last-year: 52 weeks back ±14 days
-  const lyTarget = subDays(now, 364);
-  const lyFrom = format(subDays(lyTarget, 14), "yyyy-MM-dd");
-  const lyTo = format(addDays(lyTarget, 14), "yyyy-MM-dd");
-
   try {
-    const [recentRows, lyRows] = await Promise.all([
-      fetchNwssAggregated(trendFrom, null),
-      fetchNwssAggregated(lyFrom, lyTo),
-    ]);
+    const res = await fetch(NWSS_CSV_URL, { next: { revalidate: 43200 } });
+    if (!res.ok) throw new Error(`NWSS CSV ${res.status}`);
+    const text = await res.text();
+    const rows = parseNwssCsv(text);
 
-    const points = recentRows.map(makeWastewaterPoint); // newest first
-    const thisWeek = points[0] ?? null;
-    const lastWeek = points[1] ?? null;
-    const sameWeekLastYear = lyRows[0] ? makeWastewaterPoint(lyRows[0]) : null;
-    // Reverse so oldest is first for charting; cap at 12 weeks
-    const trendSeries = points.slice(0, 12).reverse();
+    // Sort newest first
+    rows.sort((a, b) => b.weekEnding.localeCompare(a.weekEnding));
 
-    return { thisWeek, lastWeek, sameWeekLastYear, trendSeries, error: null };
+    if (rows.length === 0) {
+      return { current: null, trendSeries: [], error: "No NWSS data in CSV" };
+    }
+
+    // Build lookup map for same-week-last-year matching
+    const byDate = new Map(rows.map((r) => [r.weekEnding, r]));
+
+    const makePoint = (raw: NwssRawRow, lyRaw?: NwssRawRow): WastewaterWVAL => ({
+      weekEnding: raw.weekEnding,
+      weekLabel: format(new Date(`${raw.weekEnding}T12:00:00Z`), "MMM d"),
+      national: raw.national,
+      midwest: raw.midwest,
+      northeast: raw.northeast,
+      south: raw.south,
+      west: raw.west,
+      nationalLY: lyRaw?.national ?? null,
+    });
+
+    // Find the closest row to 52 weeks (364 days) prior
+    const findLY = (weekEnding: string): NwssRawRow | undefined => {
+      const ms = new Date(`${weekEnding}T12:00:00Z`).getTime();
+      const lyMs = ms - 364 * 24 * 60 * 60 * 1000;
+      const lyStr = format(new Date(lyMs), "yyyy-MM-dd");
+      if (byDate.has(lyStr)) return byDate.get(lyStr);
+      for (let d = 1; d <= 7; d++) {
+        const earlier = format(new Date(lyMs - d * 86400000), "yyyy-MM-dd");
+        const later = format(new Date(lyMs + d * 86400000), "yyyy-MM-dd");
+        if (byDate.has(earlier)) return byDate.get(earlier);
+        if (byDate.has(later)) return byDate.get(later);
+      }
+      return undefined;
+    };
+
+    // Take 12 most recent, reverse for oldest-first chart display
+    const recentRows = rows.slice(0, 12);
+    const trendSeries = recentRows
+      .map((row) => makePoint(row, findLY(row.weekEnding)))
+      .reverse();
+
+    const current = makePoint(rows[0], findLY(rows[0].weekEnding));
+
+    return { current, trendSeries, error: null };
   } catch (e) {
     return {
-      thisWeek: null,
-      lastWeek: null,
-      sameWeekLastYear: null,
+      current: null,
       trendSeries: [],
       error: e instanceof Error ? e.message : "Unknown error",
     };
@@ -190,11 +232,15 @@ export async function GET() {
     fluResult.sameWeekLastYear?.wili
   );
 
-  const wwCurrent = wastewaterResult.thisWeek ?? wastewaterResult.lastWeek;
-  const wwLevel = getWastewaterLevel(wwCurrent?.avgPercentile ?? null);
+  const wwLevel = getWastewaterLevel(wastewaterResult.current?.national ?? null);
+  // Trend: compare current to previous week (second-to-last in trendSeries)
+  const wwPrevWeek =
+    wastewaterResult.trendSeries.length >= 2
+      ? wastewaterResult.trendSeries[wastewaterResult.trendSeries.length - 2]
+      : null;
   const wwTrend = getTrend(
-    wwCurrent?.avgPercentile,
-    wastewaterResult.sameWeekLastYear?.avgPercentile
+    wastewaterResult.current?.national,
+    wwPrevWeek?.national
   );
 
   const response: IllnessApiResponse = {
@@ -208,12 +254,10 @@ export async function GET() {
       error: fluResult.error,
     },
     wastewater: {
-      thisWeek: wastewaterResult.thisWeek,
-      lastWeek: wastewaterResult.lastWeek,
-      sameWeekLastYear: wastewaterResult.sameWeekLastYear,
+      current: wastewaterResult.current,
       trendSeries: wastewaterResult.trendSeries,
-      trend: wwTrend,
       level: wwLevel,
+      trend: wwTrend,
       error: wastewaterResult.error,
     },
   };

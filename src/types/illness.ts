@@ -16,12 +16,16 @@ export interface FluDataPoint {
   weekLabel: string;
 }
 
-export interface WastewaterDataPoint {
-  weekEnding: string;         // ISO date "2026-02-14"
-  weekLabel: string;          // "Week of Feb 14"
-  sitesReporting: number;
-  avgPercentile: number | null;  // 0–100: avg percentile vs historical at each site
-  detectProp: number | null;     // 0–100: % of sites detecting COVID
+/** One week of CDC NWSS Wastewater Viral Activity Level (WVAL) data */
+export interface WastewaterWVAL {
+  weekEnding: string;        // ISO date "2026-02-14"
+  weekLabel: string;         // "Feb 14"
+  national: number | null;   // National_WVAL (0–10+ scale)
+  midwest: number | null;
+  northeast: number | null;
+  south: number | null;
+  west: number | null;
+  nationalLY: number | null; // same-week-last-year national WVAL
 }
 
 export interface IllnessApiResponse {
@@ -35,12 +39,10 @@ export interface IllnessApiResponse {
     error: string | null;
   };
   wastewater: {
-    thisWeek: WastewaterDataPoint | null;
-    lastWeek: WastewaterDataPoint | null;
-    sameWeekLastYear: WastewaterDataPoint | null;
-    trendSeries: WastewaterDataPoint[];  // up to 12 weeks, oldest first
-    trend: Trend;
+    current: WastewaterWVAL | null;          // most recent week
+    trendSeries: WastewaterWVAL[];            // up to 12 weeks, oldest first
     level: IllnessLevel;
+    trend: Trend;
     error: string | null;
   };
 }

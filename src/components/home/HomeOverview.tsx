@@ -119,10 +119,8 @@ export function HomeOverview() {
                 <div>
                   <span className="text-xs font-semibold text-molly-slate">COVID Wastewater</span>
                   <div className="text-lg font-bold font-mono text-molly-orange">
-                    {illness.data.wastewater.thisWeek?.detectProp != null
-                      ? `${illness.data.wastewater.thisWeek.detectProp}% sites`
-                      : illness.data.wastewater.lastWeek?.detectProp != null
-                      ? `${illness.data.wastewater.lastWeek.detectProp}% sites`
+                    {illness.data.wastewater.current?.national != null
+                      ? `WVAL ${illness.data.wastewater.current.national.toFixed(1)}`
                       : "–"}
                   </div>
                 </div>

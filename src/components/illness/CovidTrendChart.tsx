@@ -1,6 +1,13 @@
 "use client";
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import type { IllnessApiResponse } from "@/types/illness";
 
 interface Props {
@@ -8,15 +15,14 @@ interface Props {
 }
 
 export function WastewaterTrendChart({ wastewater }: Props) {
-  const data = [
-    { name: "Last Year", value: wastewater.sameWeekLastYear?.detectProp ?? 0 },
-    { name: "Prev Week", value: wastewater.lastWeek?.detectProp ?? 0 },
-    { name: "This Week", value: (wastewater.thisWeek ?? wastewater.lastWeek)?.detectProp ?? 0 },
-  ];
+  // Show last 6 weeks of national WVAL + LY national as a mini sparkline
+  const data = wastewater.trendSeries.slice(-6).map((pt) => ({
+    name: pt.weekLabel,
+    wval: pt.national,
+    wvalLY: pt.nationalLY,
+  }));
 
-  const colors = ["#94A3B8", "#93C5FD", "#0033A0"];
-
-  if (data.every((d) => d.value === 0)) {
+  if (data.length === 0) {
     return (
       <div className="flex items-center justify-center h-24 text-sm text-molly-slate">
         Wastewater data unavailable
@@ -26,19 +32,33 @@ export function WastewaterTrendChart({ wastewater }: Props) {
 
   return (
     <ResponsiveContainer width="100%" height={120}>
-      <BarChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-        <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" hide />
+      <LineChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+        <XAxis dataKey="name" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
+        <YAxis tick={{ fontSize: 10 }} domain={[0, 10]} hide />
         <Tooltip
           contentStyle={{ fontSize: 11, borderRadius: 6 }}
-          formatter={(v: number) => [`${v}%`, "Sites detecting"]}
+          formatter={(v: number, name: string) => [
+            v?.toFixed(1),
+            name === "wval" ? "WVAL (this year)" : "WVAL (last year)",
+          ]}
         />
-        <Bar dataKey="value" radius={[3, 3, 0, 0]}>
-          {data.map((_, i) => (
-            <Cell key={i} fill={colors[i]} />
-          ))}
-        </Bar>
-      </BarChart>
+        <Line
+          type="monotone"
+          dataKey="wval"
+          stroke="#F97316"
+          strokeWidth={2}
+          dot={false}
+          activeDot={{ r: 3 }}
+        />
+        <Line
+          type="monotone"
+          dataKey="wvalLY"
+          stroke="#94A3B8"
+          strokeWidth={1.5}
+          strokeDasharray="3 3"
+          dot={false}
+        />
+      </LineChart>
     </ResponsiveContainer>
   );
 }
