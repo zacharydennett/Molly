@@ -1,10 +1,15 @@
 "use client";
 
-import { Stethoscope } from "lucide-react";
-import { getThisMondayLabel } from "@/lib/utils/dates";
+import { Stethoscope, ChevronDown } from "lucide-react";
+import { format } from "date-fns";
+import { useWeek } from "@/contexts/WeekContext";
+import { getRecentSaturdays } from "@/lib/utils/dates";
+
+const SATURDAYS = getRecentSaturdays(12);
 
 export function MollyHeader() {
-  const dateLabel = getThisMondayLabel();
+  const { selectedSaturday, setSaturday } = useWeek();
+  const weekEnd = format(selectedSaturday, "yyyy-MM-dd");
 
   return (
     <header className="bg-molly-navy text-white px-4 py-3 md:px-6">
@@ -25,9 +30,28 @@ export function MollyHeader() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="bg-molly-red text-white text-xs font-mono font-semibold px-3 py-1.5 rounded-full whitespace-nowrap">
-            {dateLabel}
+
+        {/* Week selector — styled as the red pill */}
+        <div className="relative flex items-center">
+          <div className="bg-molly-red rounded-full flex items-center pr-2">
+            <select
+              value={weekEnd}
+              onChange={(e) => {
+                const d = new Date(`${e.target.value}T12:00:00`);
+                setSaturday(d);
+              }}
+              className="bg-transparent text-white text-xs font-mono font-semibold appearance-none cursor-pointer pl-3 pr-1 py-1.5 outline-none"
+            >
+              {SATURDAYS.map((sat) => {
+                const val = format(sat, "yyyy-MM-dd");
+                return (
+                  <option key={val} value={val} className="bg-molly-navy text-white">
+                    Week ending {format(sat, "MMM d, yyyy")}
+                  </option>
+                );
+              })}
+            </select>
+            <ChevronDown className="w-3 h-3 text-white pointer-events-none shrink-0" />
           </div>
         </div>
       </div>

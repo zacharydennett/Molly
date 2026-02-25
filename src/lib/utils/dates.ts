@@ -112,6 +112,96 @@ export function toWaybackTimestamp(date: Date): string {
   return format(date, "yyyyMMddHHmmss");
 }
 
+// ─── Saturday-based week utilities ───────────────────────────────────────────
+
+/** Returns the most recent Saturday ≤ today, with time zeroed to local midnight */
+export function getMostRecentSaturday(): Date {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = today.getDay(); // 0=Sun … 6=Sat
+  const daysBack = (day + 1) % 7; // Sat→0, Sun→1, Mon→2, …, Fri→6
+  const sat = new Date(today);
+  sat.setDate(today.getDate() - daysBack);
+  return sat;
+}
+
+/** Returns the n most recent Saturdays (including the most recent), newest first */
+export function getRecentSaturdays(n: number): Date[] {
+  const first = getMostRecentSaturday();
+  return Array.from({ length: n }, (_, i) => {
+    const s = new Date(first);
+    s.setDate(first.getDate() - i * 7);
+    return s;
+  });
+}
+
+/**
+ * Given a Saturday end-date, returns Mon–Sat ranges for:
+ * - lastWeek (the selected week Mon–Sat)
+ * - previousWeek (the prior Mon–Sat)
+ * - sameWeekLastYear (52 weeks back)
+ * Reuses the WeekRange interface so APIs stay compatible.
+ */
+export function saturdayToWeekRanges(saturday: Date): {
+  lastWeek: WeekRange;
+  previousWeek: WeekRange;
+  sameWeekLastYear: WeekRange;
+} {
+  const sat = new Date(saturday);
+  sat.setHours(12, 0, 0, 0); // noon to avoid DST edge cases
+
+  const mon = subDays(sat, 5);
+  const prevMon = subDays(sat, 12);
+  const prevSat = subDays(sat, 7);
+  const lyMon = subDays(sat, 5 + 364);
+  const lySat = subDays(sat, 364);
+
+  return {
+    lastWeek: {
+      start: format(mon, "yyyy-MM-dd"),
+      end: format(sat, "yyyy-MM-dd"),
+      label: `Week of ${format(mon, "MMM d")}`,
+    },
+    previousWeek: {
+      start: format(prevMon, "yyyy-MM-dd"),
+      end: format(prevSat, "yyyy-MM-dd"),
+      label: `Week of ${format(prevMon, "MMM d")}`,
+    },
+    sameWeekLastYear: {
+      start: format(lyMon, "yyyy-MM-dd"),
+      end: format(lySat, "yyyy-MM-dd"),
+      label: `Week of ${format(lyMon, "MMM d, yyyy")}`,
+    },
+  };
+}
+
+/**
+ * Given a Saturday end-date, returns the CDC epiweeks for
+ * that week, the prior week, and same week last year.
+ */
+export function saturdayToEpiweeks(saturday: Date): {
+  selectedWeek: number;
+  previousWeek: number;
+  sameWeekLastYear: number;
+} {
+  const sat = new Date(saturday);
+  return {
+    selectedWeek: toEpiweek(sat),
+    previousWeek: toEpiweek(subDays(sat, 7)),
+    sameWeekLastYear: toEpiweek(subDays(sat, 364)),
+  };
+}
+
+/**
+ * Given a Saturday end-date, returns the Wednesday of that week
+ * (Saturday − 3 days) — used as the target for Wayback CDX lookups.
+ */
+export function saturdayToWednesday(saturday: Date): Date {
+  const wed = subDays(new Date(saturday), 3);
+  wed.setHours(12, 0, 0, 0);
+  return wed;
+}
+
 export function formatWaybackTimestamp(ts: string): string {
   if (!ts || ts.length < 8) return "Unknown date";
   const year = ts.slice(0, 4);

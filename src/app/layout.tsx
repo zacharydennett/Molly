@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { MollyHeader } from "@/components/layout/MollyHeader";
-import { TabBar } from "@/components/layout/TabBar";
-import { Footer } from "@/components/layout/Footer";
+import { ClientLayout } from "@/components/layout/ClientLayout";
 
 export const metadata: Metadata = {
   title: "Molly — The Monday Reporter",
@@ -19,12 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen flex flex-col bg-molly-slate-light">
-        <MollyHeader />
-        <TabBar />
-        <main className="flex-1 max-w-7xl w-full mx-auto px-3 md:px-6 py-6 tab-content">
-          {children}
-        </main>
-        <Footer />
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentEpiweeks } from "@/lib/utils/dates";
+import { saturdayToEpiweeks, getMostRecentSaturday } from "@/lib/utils/dates";
 import type {
   IllnessApiResponse,
   FluDataPoint,
@@ -43,14 +43,14 @@ function getTrend(
 
 // ─── Flu (CDC FluView via Delphi Epidata) ────────────────────────────────────
 
-async function fetchFluData(): Promise<{
+async function fetchFluData(saturday: Date): Promise<{
   thisWeek: FluDataPoint | null;
   lastWeek: FluDataPoint | null;
   sameWeekLastYear: FluDataPoint | null;
   error: string | null;
 }> {
-  const epiweeks = getCurrentEpiweeks();
-  const epiStr = `${epiweeks.thisWeek},${epiweeks.lastWeek},${epiweeks.sameWeekLastYear}`;
+  const epiweeks = saturdayToEpiweeks(saturday);
+  const epiStr = `${epiweeks.selectedWeek},${epiweeks.previousWeek},${epiweeks.sameWeekLastYear}`;
   const url = `${DELPHI_FLU_URL}?regions=nat&epiweeks=${epiStr}`;
 
   try {
@@ -84,8 +84,8 @@ async function fetchFluData(): Promise<{
     };
 
     return {
-      thisWeek: makePoint(epiweeks.thisWeek),
-      lastWeek: makePoint(epiweeks.lastWeek),
+      thisWeek: makePoint(epiweeks.selectedWeek),
+      lastWeek: makePoint(epiweeks.previousWeek),
       sameWeekLastYear: makePoint(epiweeks.sameWeekLastYear),
       error: null,
     };
@@ -153,7 +153,7 @@ function parseNwssCsv(text: string): NwssRawRow[] {
   });
 }
 
-async function fetchWastewaterData(): Promise<{
+async function fetchWastewaterData(saturday: Date): Promise<{
   current: WastewaterWVAL | null;
   trendSeries: WastewaterWVAL[];
   error: string | null;
@@ -171,7 +171,14 @@ async function fetchWastewaterData(): Promise<{
       return { current: null, trendSeries: [], error: "No NWSS data in CSV" };
     }
 
-    // Build lookup map for same-week-last-year matching
+    // Filter to rows on or before the selected Saturday
+    const cutoff = format(saturday, "yyyy-MM-dd");
+    const eligibleRows = rows.filter((r) => r.weekEnding <= cutoff);
+    if (eligibleRows.length === 0) {
+      return { current: null, trendSeries: [], error: "No NWSS data for selected week" };
+    }
+
+    // Build lookup map for same-week-last-year matching (use all rows, not just eligible)
     const byDate = new Map(rows.map((r) => [r.weekEnding, r]));
 
     const makePoint = (raw: NwssRawRow, lyRaw?: NwssRawRow): WastewaterWVAL => ({
@@ -200,13 +207,13 @@ async function fetchWastewaterData(): Promise<{
       return undefined;
     };
 
-    // Take 12 most recent, reverse for oldest-first chart display
-    const recentRows = rows.slice(0, 12);
+    // Take 12 most recent eligible rows, reverse for oldest-first chart display
+    const recentRows = eligibleRows.slice(0, 12);
     const trendSeries = recentRows
       .map((row) => makePoint(row, findLY(row.weekEnding)))
       .reverse();
 
-    const current = makePoint(rows[0], findLY(rows[0].weekEnding));
+    const current = makePoint(eligibleRows[0], findLY(eligibleRows[0].weekEnding));
 
     return { current, trendSeries, error: null };
   } catch (e) {
@@ -220,10 +227,16 @@ async function fetchWastewaterData(): Promise<{
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const weekEndParam = searchParams.get("weekEnd");
+  const saturday = weekEndParam
+    ? new Date(`${weekEndParam}T12:00:00`)
+    : getMostRecentSaturday();
+
   const [fluResult, wastewaterResult] = await Promise.all([
-    fetchFluData(),
-    fetchWastewaterData(),
+    fetchFluData(saturday),
+    fetchWastewaterData(saturday),
   ]);
 
   const fluLevel = getFluLevel(fluResult.lastWeek?.wili ?? fluResult.thisWeek?.wili ?? 0);

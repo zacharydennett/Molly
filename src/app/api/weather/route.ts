@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { REGIONS, getStormLabel, isSevereStorm } from "@/lib/utils/regions";
-import { getWeekRanges } from "@/lib/utils/dates";
+import { saturdayToWeekRanges, getMostRecentSaturday } from "@/lib/utils/dates";
 import type { WeatherApiResponse, WeekSummary } from "@/types/weather";
 
 const BASE_URL = "https://archive-api.open-meteo.com/v1/archive";
@@ -82,8 +82,13 @@ async function fetchWeekData(
   }
 }
 
-export async function GET() {
-  const ranges = getWeekRanges();
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const weekEndParam = searchParams.get("weekEnd");
+  const saturday = weekEndParam
+    ? new Date(`${weekEndParam}T12:00:00`)
+    : getMostRecentSaturday();
+  const ranges = saturdayToWeekRanges(saturday);
 
   const regionPromises = REGIONS.map(async (region) => {
     const [lastWeek, previousWeek, sameWeekLastYear] = await Promise.all([

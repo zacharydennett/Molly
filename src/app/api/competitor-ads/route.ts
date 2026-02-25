@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { format, addDays, subDays } from "date-fns";
 import {
   formatWaybackTimestamp,
-  getPrevWeekWednesday,
-  getLastYearWednesday,
+  saturdayToWednesday,
+  getMostRecentSaturday,
 } from "@/lib/utils/dates";
 import type { CompetitorAdsApiResponse, RetailerAdData, RetailerSnapshot } from "@/types/competitor-ads";
 
@@ -122,9 +122,15 @@ async function getCdxSnapshot(
   }
 }
 
-export async function GET() {
-  const prevWed = getPrevWeekWednesday();
-  const lastYearWed = getLastYearWednesday();
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const weekEndParam = searchParams.get("weekEnd");
+  const saturday = weekEndParam
+    ? new Date(`${weekEndParam}T12:00:00`)
+    : getMostRecentSaturday();
+
+  const prevWed = saturdayToWednesday(saturday);
+  const lastYearWed = saturdayToWednesday(subDays(saturday, 364));
 
   const prevWeekLabel = format(prevWed, "MMM d, yyyy");
   const lastYearLabel = format(lastYearWed, "MMM d, yyyy");
