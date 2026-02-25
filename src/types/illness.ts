@@ -16,11 +16,12 @@ export interface FluDataPoint {
   weekLabel: string;
 }
 
-export interface CovidDataPoint {
-  weekEnding: string;
-  weeklyAdmissions: number;
-  per100k: number | null;
-  weekLabel: string;
+export interface WastewaterDataPoint {
+  weekEnding: string;         // ISO date "2026-02-14"
+  weekLabel: string;          // "Week of Feb 14"
+  sitesReporting: number;
+  avgPercentile: number | null;  // 0–100: avg percentile vs historical at each site
+  detectProp: number | null;     // 0–100: % of sites detecting COVID
 }
 
 export interface IllnessApiResponse {
@@ -33,11 +34,12 @@ export interface IllnessApiResponse {
     nationalLevel: IllnessLevel;
     error: string | null;
   };
-  covid: {
-    thisWeek: CovidDataPoint | null;
-    lastWeek: CovidDataPoint | null;
-    sameWeekLastYear: CovidDataPoint | null;
+  wastewater: {
+    thisWeek: WastewaterDataPoint | null;
+    lastWeek: WastewaterDataPoint | null;
+    sameWeekLastYear: WastewaterDataPoint | null;
     trend: Trend;
+    level: IllnessLevel;
     error: string | null;
   };
 }

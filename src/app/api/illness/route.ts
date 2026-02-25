@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { getCurrentEpiweeks } from "@/lib/utils/dates";
-import type { IllnessApiResponse, FluDataPoint, CovidDataPoint, IllnessLevel, Trend } from "@/types/illness";
-import { format, subWeeks, subYears } from "date-fns";
+import type {
+  IllnessApiResponse,
+  FluDataPoint,
+  WastewaterDataPoint,
+  IllnessLevel,
+  Trend,
+} from "@/types/illness";
+import { format, subDays, addDays, subWeeks, subYears } from "date-fns";
 
 const DELPHI_FLU_URL = "https://api.delphi.cmu.edu/epidata/fluview/";
-const CDC_COVID_URL = "https://data.cdc.gov/resource/3nnm-4jni.json";
+const NWSS_URL = "https://data.cdc.gov/resource/2ew6-ywp6.json";
 
 function getFluLevel(wili: number): IllnessLevel {
   if (wili < 2.5) return "minimal";
@@ -14,16 +20,23 @@ function getFluLevel(wili: number): IllnessLevel {
   return "very_high";
 }
 
+function getWastewaterLevel(percentile: number | null): IllnessLevel {
+  if (percentile == null) return "unknown";
+  if (percentile < 10) return "minimal";
+  if (percentile < 25) return "low";
+  if (percentile < 50) return "moderate";
+  if (percentile < 75) return "high";
+  return "very_high";
+}
+
 function getTrend(current: number | null | undefined, previous: number | null | undefined): Trend {
   if (current == null || previous == null) return "unknown";
   const diff = current - previous;
-  if (Math.abs(diff) < 0.1) return "stable";
+  if (Math.abs(diff) < 0.5) return "stable";
   return diff > 0 ? "rising" : "falling";
 }
 
-function weekLabel(date: Date): string {
-  return `Week of ${format(date, "MMM d")}`;
-}
+// ─── Flu (CDC FluView via Delphi Epidata) ────────────────────────────────────
 
 async function fetchFluData(): Promise<{
   thisWeek: FluDataPoint | null;
@@ -81,73 +94,73 @@ async function fetchFluData(): Promise<{
   }
 }
 
-async function fetchCovidData(): Promise<{
-  thisWeek: CovidDataPoint | null;
-  lastWeek: CovidDataPoint | null;
-  sameWeekLastYear: CovidDataPoint | null;
+// ─── Wastewater (CDC NWSS) ───────────────────────────────────────────────────
+
+interface NwssAggRow {
+  date_end: string;
+  avg_percentile: string;
+  avg_detect_prop: string;
+  site_count: string;
+}
+
+async function fetchNwssAggregated(fromDate: string, toDate: string | null): Promise<NwssAggRow[]> {
+  const whereClause = toDate
+    ? `date_end >= '${fromDate}T00:00:00.000' AND date_end <= '${toDate}T23:59:59.000'`
+    : `date_end >= '${fromDate}T00:00:00.000'`;
+
+  const params = new URLSearchParams({
+    $select: "date_end,avg(percentile) as avg_percentile,avg(detect_prop_15d) as avg_detect_prop,count(*) as site_count",
+    $where: whereClause,
+    $group: "date_end",
+    $order: "date_end DESC",
+    $limit: "15",
+  });
+
+  const res = await fetch(`${NWSS_URL}?${params}`, { next: { revalidate: 43200 } });
+  if (!res.ok) throw new Error(`NWSS API ${res.status}`);
+  return res.json();
+}
+
+function makeWastewaterPoint(row: NwssAggRow): WastewaterDataPoint {
+  const dateStr = row.date_end.split("T")[0]; // "2026-02-14"
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  const avgPct = row.avg_percentile ? parseFloat(row.avg_percentile) : null;
+  const detectRaw = row.avg_detect_prop ? parseFloat(row.avg_detect_prop) : null;
+  return {
+    weekEnding: dateStr,
+    weekLabel: `Week of ${format(d, "MMM d")}`,
+    sitesReporting: parseInt(row.site_count, 10) || 0,
+    avgPercentile: avgPct != null ? Math.round(avgPct) : null,
+    // detect_prop_15d is a 0–1 proportion; convert to 0–100 percentage
+    detectProp: detectRaw != null ? Math.round(detectRaw * 100) : null,
+  };
+}
+
+async function fetchWastewaterData(): Promise<{
+  thisWeek: WastewaterDataPoint | null;
+  lastWeek: WastewaterDataPoint | null;
+  sameWeekLastYear: WastewaterDataPoint | null;
   error: string | null;
 }> {
   const now = new Date();
-  const lastWeekDate = subWeeks(now, 1);
-  const lastYearDate = subYears(lastWeekDate, 1);
-  const twoWeeksAgo = subWeeks(now, 2);
-
-  // Fetch last ~56 weeks to get comparison points
-  const afterDate = format(subWeeks(lastYearDate, 2), "yyyy-MM-dd");
-  const url = `${CDC_COVID_URL}?$where=week_end_date>'${afterDate}'T00:00:00.000&$order=week_end_date DESC&$limit=60`;
+  // Recent window: last 45 days → gives the 2 most recent reporting weeks
+  const recentFrom = format(subDays(now, 45), "yyyy-MM-dd");
+  // Same-week-last-year: 52 weeks back ±14 days
+  const lyTarget = subDays(now, 364);
+  const lyFrom = format(subDays(lyTarget, 14), "yyyy-MM-dd");
+  const lyTo = format(addDays(lyTarget, 14), "yyyy-MM-dd");
 
   try {
-    const res = await fetch(url, { next: { revalidate: 43200 } });
-    if (!res.ok) throw new Error(`CDC COVID ${res.status}`);
-    const rows: Array<{
-      week_end_date: string;
-      total_admissions_covid_confirmed_all_ages?: string;
-      total_admissions_covid_confirmed_adult?: string;
-    }> = await res.json();
+    const [recentRows, lyRows] = await Promise.all([
+      fetchNwssAggregated(recentFrom, null),
+      fetchNwssAggregated(lyFrom, lyTo),
+    ]);
 
-    const makePoint = (targetDate: Date): CovidDataPoint | null => {
-      const targetStr = format(targetDate, "yyyy-MM-dd");
-      // Find closest week
-      const closest = rows.find((r) => r.week_end_date?.startsWith(targetStr));
-      if (!closest) {
-        // Try ±3 days
-        const candidates = rows.filter((r) => {
-          const d = new Date(r.week_end_date);
-          return Math.abs(d.getTime() - targetDate.getTime()) < 4 * 86400000;
-        });
-        if (!candidates.length) return null;
-        const row = candidates[0];
-        const admissions = parseInt(
-          row.total_admissions_covid_confirmed_all_ages ??
-            row.total_admissions_covid_confirmed_adult ??
-            "0"
-        );
-        return {
-          weekEnding: row.week_end_date,
-          weeklyAdmissions: admissions,
-          per100k: null,
-          weekLabel: weekLabel(new Date(row.week_end_date)),
-        };
-      }
-      const admissions = parseInt(
-        closest.total_admissions_covid_confirmed_all_ages ??
-          closest.total_admissions_covid_confirmed_adult ??
-          "0"
-      );
-      return {
-        weekEnding: closest.week_end_date,
-        weeklyAdmissions: admissions,
-        per100k: null,
-        weekLabel: weekLabel(new Date(closest.week_end_date)),
-      };
-    };
+    const thisWeek = recentRows[0] ? makeWastewaterPoint(recentRows[0]) : null;
+    const lastWeek = recentRows[1] ? makeWastewaterPoint(recentRows[1]) : null;
+    const sameWeekLastYear = lyRows[0] ? makeWastewaterPoint(lyRows[0]) : null;
 
-    return {
-      thisWeek: makePoint(now),
-      lastWeek: makePoint(lastWeekDate),
-      sameWeekLastYear: makePoint(lastYearDate),
-      error: null,
-    };
+    return { thisWeek, lastWeek, sameWeekLastYear, error: null };
   } catch (e) {
     return {
       thisWeek: null,
@@ -158,10 +171,12 @@ async function fetchCovidData(): Promise<{
   }
 }
 
+// ─── Route handler ────────────────────────────────────────────────────────────
+
 export async function GET() {
-  const [fluResult, covidResult] = await Promise.all([
+  const [fluResult, wastewaterResult] = await Promise.all([
     fetchFluData(),
-    fetchCovidData(),
+    fetchWastewaterData(),
   ]);
 
   const fluLevel = getFluLevel(fluResult.lastWeek?.wili ?? fluResult.thisWeek?.wili ?? 0);
@@ -169,9 +184,12 @@ export async function GET() {
     fluResult.lastWeek?.wili ?? fluResult.thisWeek?.wili,
     fluResult.sameWeekLastYear?.wili
   );
-  const covidTrend = getTrend(
-    covidResult.lastWeek?.weeklyAdmissions,
-    covidResult.sameWeekLastYear?.weeklyAdmissions
+
+  const wwCurrent = wastewaterResult.thisWeek ?? wastewaterResult.lastWeek;
+  const wwLevel = getWastewaterLevel(wwCurrent?.avgPercentile ?? null);
+  const wwTrend = getTrend(
+    wwCurrent?.avgPercentile,
+    wastewaterResult.sameWeekLastYear?.avgPercentile
   );
 
   const response: IllnessApiResponse = {
@@ -184,12 +202,13 @@ export async function GET() {
       nationalLevel: fluLevel,
       error: fluResult.error,
     },
-    covid: {
-      thisWeek: covidResult.thisWeek,
-      lastWeek: covidResult.lastWeek,
-      sameWeekLastYear: covidResult.sameWeekLastYear,
-      trend: covidTrend,
-      error: covidResult.error,
+    wastewater: {
+      thisWeek: wastewaterResult.thisWeek,
+      lastWeek: wastewaterResult.lastWeek,
+      sameWeekLastYear: wastewaterResult.sameWeekLastYear,
+      trend: wwTrend,
+      level: wwLevel,
+      error: wastewaterResult.error,
     },
   };
 

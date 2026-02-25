@@ -115,11 +115,15 @@ export function HomeOverview() {
                     {illness.data.flu.trend === "stable" && <Minus className="w-4 h-4 text-slate-400" />}
                   </div>
                 </div>
-                {/* COVID */}
+                {/* COVID Wastewater */}
                 <div>
-                  <span className="text-xs font-semibold text-molly-slate">COVID Admissions</span>
+                  <span className="text-xs font-semibold text-molly-slate">COVID Wastewater</span>
                   <div className="text-lg font-bold font-mono text-molly-orange">
-                    {illness.data.covid.lastWeek?.weeklyAdmissions?.toLocaleString() ?? "–"}
+                    {illness.data.wastewater.thisWeek?.detectProp != null
+                      ? `${illness.data.wastewater.thisWeek.detectProp}% sites`
+                      : illness.data.wastewater.lastWeek?.detectProp != null
+                      ? `${illness.data.wastewater.lastWeek.detectProp}% sites`
+                      : "–"}
                   </div>
                 </div>
               </div>

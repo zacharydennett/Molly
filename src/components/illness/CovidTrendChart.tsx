@@ -4,24 +4,22 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import type { IllnessApiResponse } from "@/types/illness";
 
 interface Props {
-  covid: IllnessApiResponse["covid"];
+  wastewater: IllnessApiResponse["wastewater"];
 }
 
-export function CovidTrendChart({ covid }: Props) {
+export function WastewaterTrendChart({ wastewater }: Props) {
   const data = [
-    { name: "Last Year", value: covid.sameWeekLastYear?.weeklyAdmissions ?? 0 },
-    { name: "Prev Week", value: covid.lastWeek?.weeklyAdmissions ?? 0 },
-    { name: "Last Week", value: covid.thisWeek?.weeklyAdmissions ?? covid.lastWeek?.weeklyAdmissions ?? 0 },
+    { name: "Last Year", value: wastewater.sameWeekLastYear?.detectProp ?? 0 },
+    { name: "Prev Week", value: wastewater.lastWeek?.detectProp ?? 0 },
+    { name: "This Week", value: (wastewater.thisWeek ?? wastewater.lastWeek)?.detectProp ?? 0 },
   ];
-
-  const maxVal = Math.max(...data.map((d) => d.value), 1);
 
   const colors = ["#94A3B8", "#93C5FD", "#0033A0"];
 
   if (data.every((d) => d.value === 0)) {
     return (
       <div className="flex items-center justify-center h-24 text-sm text-molly-slate">
-        COVID data unavailable
+        Wastewater data unavailable
       </div>
     );
   }
@@ -30,10 +28,10 @@ export function CovidTrendChart({ covid }: Props) {
     <ResponsiveContainer width="100%" height={120}>
       <BarChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
         <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-        <YAxis tick={{ fontSize: 10 }} domain={[0, maxVal * 1.2]} hide />
+        <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" hide />
         <Tooltip
           contentStyle={{ fontSize: 11, borderRadius: 6 }}
-          formatter={(v: number) => [v.toLocaleString(), "Admissions"]}
+          formatter={(v: number) => [`${v}%`, "Sites detecting"]}
         />
         <Bar dataKey="value" radius={[3, 3, 0, 0]}>
           {data.map((_, i) => (

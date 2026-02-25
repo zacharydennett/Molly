@@ -16,10 +16,10 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 
 interface Props {
   flu: IllnessApiResponse["flu"];
-  covid: IllnessApiResponse["covid"];
+  wastewater: IllnessApiResponse["wastewater"];
 }
 
-export function IllnessComparisonChart({ flu, covid }: Props) {
+export function IllnessComparisonChart({ flu, wastewater }: Props) {
   const fluData = [
     {
       name: "Wk -52 (LY)",
@@ -38,20 +38,24 @@ export function IllnessComparisonChart({ flu, covid }: Props) {
     },
   ].filter((d) => d["Flu ILI%"] !== null);
 
-  const covidData = [
+  const wwData = [
     {
       name: "Wk -52 (LY)",
-      "COVID Admissions": covid.sameWeekLastYear?.weeklyAdmissions ?? null,
+      "Sites Detecting (%)": wastewater.sameWeekLastYear?.detectProp ?? null,
+      label: wastewater.sameWeekLastYear?.weekLabel,
     },
     {
       name: "Prev Wk",
-      "COVID Admissions": covid.lastWeek?.weeklyAdmissions ?? null,
+      "Sites Detecting (%)": wastewater.lastWeek?.detectProp ?? null,
+      label: wastewater.lastWeek?.weekLabel,
     },
     {
       name: "This Wk",
-      "COVID Admissions": covid.thisWeek?.weeklyAdmissions ?? null,
+      "Sites Detecting (%)":
+        (wastewater.thisWeek ?? wastewater.lastWeek)?.detectProp ?? null,
+      label: (wastewater.thisWeek ?? wastewater.lastWeek)?.weekLabel,
     },
-  ].filter((d) => d["COVID Admissions"] !== null);
+  ].filter((d) => d["Sites Detecting (%)"] !== null);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -88,31 +92,31 @@ export function IllnessComparisonChart({ flu, covid }: Props) {
         )}
       </Card>
 
-      {/* COVID trend */}
+      {/* Wastewater trend */}
       <Card>
         <CardHeader>
-          <CardTitle>COVID Admissions — 3-Point Comparison</CardTitle>
+          <CardTitle>COVID Wastewater Detection — 3-Point Comparison</CardTitle>
         </CardHeader>
-        {covidData.length > 0 ? (
+        {wwData.length > 0 ? (
           <ResponsiveContainer width="100%" height={220}>
-            <ComposedChart data={covidData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
+            <ComposedChart data={wwData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} unit="%" domain={[0, 100]} />
               <Tooltip
                 contentStyle={{ fontSize: 11, borderRadius: 8 }}
-                formatter={(v: number) => [v.toLocaleString(), "Admissions"]}
+                formatter={(v: number) => [`${v}%`, "Sites detecting"]}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar
-                dataKey="COVID Admissions"
+                dataKey="Sites Detecting (%)"
                 fill="#F97316"
                 opacity={0.8}
                 radius={[3, 3, 0, 0]}
               />
               <Line
                 type="monotone"
-                dataKey="COVID Admissions"
+                dataKey="Sites Detecting (%)"
                 stroke="#C2410C"
                 strokeWidth={2}
                 dot={{ r: 4 }}
@@ -121,7 +125,7 @@ export function IllnessComparisonChart({ flu, covid }: Props) {
           </ResponsiveContainer>
         ) : (
           <div className="flex items-center justify-center h-40 text-molly-slate text-sm">
-            COVID data unavailable
+            Wastewater data unavailable
           </div>
         )}
       </Card>
