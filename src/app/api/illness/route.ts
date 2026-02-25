@@ -140,11 +140,12 @@ async function fetchWastewaterData(): Promise<{
   thisWeek: WastewaterDataPoint | null;
   lastWeek: WastewaterDataPoint | null;
   sameWeekLastYear: WastewaterDataPoint | null;
+  trendSeries: WastewaterDataPoint[];
   error: string | null;
 }> {
   const now = new Date();
-  // Recent window: last 45 days → gives the 2 most recent reporting weeks
-  const recentFrom = format(subDays(now, 45), "yyyy-MM-dd");
+  // Fetch ~13 weeks for the trend (91 days); newest-first from API
+  const trendFrom = format(subDays(now, 91), "yyyy-MM-dd");
   // Same-week-last-year: 52 weeks back ±14 days
   const lyTarget = subDays(now, 364);
   const lyFrom = format(subDays(lyTarget, 14), "yyyy-MM-dd");
@@ -152,20 +153,24 @@ async function fetchWastewaterData(): Promise<{
 
   try {
     const [recentRows, lyRows] = await Promise.all([
-      fetchNwssAggregated(recentFrom, null),
+      fetchNwssAggregated(trendFrom, null),
       fetchNwssAggregated(lyFrom, lyTo),
     ]);
 
-    const thisWeek = recentRows[0] ? makeWastewaterPoint(recentRows[0]) : null;
-    const lastWeek = recentRows[1] ? makeWastewaterPoint(recentRows[1]) : null;
+    const points = recentRows.map(makeWastewaterPoint); // newest first
+    const thisWeek = points[0] ?? null;
+    const lastWeek = points[1] ?? null;
     const sameWeekLastYear = lyRows[0] ? makeWastewaterPoint(lyRows[0]) : null;
+    // Reverse so oldest is first for charting; cap at 12 weeks
+    const trendSeries = points.slice(0, 12).reverse();
 
-    return { thisWeek, lastWeek, sameWeekLastYear, error: null };
+    return { thisWeek, lastWeek, sameWeekLastYear, trendSeries, error: null };
   } catch (e) {
     return {
       thisWeek: null,
       lastWeek: null,
       sameWeekLastYear: null,
+      trendSeries: [],
       error: e instanceof Error ? e.message : "Unknown error",
     };
   }
@@ -206,6 +211,7 @@ export async function GET() {
       thisWeek: wastewaterResult.thisWeek,
       lastWeek: wastewaterResult.lastWeek,
       sameWeekLastYear: wastewaterResult.sameWeekLastYear,
+      trendSeries: wastewaterResult.trendSeries,
       trend: wwTrend,
       level: wwLevel,
       error: wastewaterResult.error,

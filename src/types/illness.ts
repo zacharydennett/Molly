@@ -38,6 +38,7 @@ export interface IllnessApiResponse {
     thisWeek: WastewaterDataPoint | null;
     lastWeek: WastewaterDataPoint | null;
     sameWeekLastYear: WastewaterDataPoint | null;
+    trendSeries: WastewaterDataPoint[];  // up to 12 weeks, oldest first
     trend: Trend;
     level: IllnessLevel;
     error: string | null;
