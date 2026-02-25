@@ -6,7 +6,7 @@ import { PIECES } from "@/lib/tetris/pieces";
 
 export function TetrisPageClient() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div>
         <h1 className="text-2xl font-bold text-molly-navy flex items-center gap-2">
           <Gamepad2 className="w-6 h-6 text-molly-red" />
@@ -18,15 +18,15 @@ export function TetrisPageClient() {
       </div>
 
       {/* Product legend */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {PIECES.map((piece) => (
           <div
             key={piece.id}
-            className="flex items-center gap-2 text-xs bg-white rounded-lg px-2 py-1.5 border border-slate-100 shadow-sm"
+            className="flex items-center gap-1.5 text-xs bg-white rounded-lg px-2 py-1 border border-slate-100 shadow-sm"
           >
             {/* Thumbnail of actual product image */}
             <div
-              className="w-8 h-8 rounded overflow-hidden shrink-0 border border-slate-200"
+              className="w-6 h-6 rounded overflow-hidden shrink-0 border border-slate-200"
               style={{ backgroundColor: piece.bgColor }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
