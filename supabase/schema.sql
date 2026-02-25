@@ -42,3 +42,22 @@ CREATE POLICY "public_insert_scores"
 -- ============================================================
 -- After running, confirm the table exists:
 -- SELECT * FROM tetris_scores LIMIT 1;
+
+-- ============================================================
+-- COMPETITOR ADS CACHE
+-- ============================================================
+CREATE TABLE IF NOT EXISTS competitor_ads_cache (
+  week_end    DATE         PRIMARY KEY,
+  data        JSONB        NOT NULL,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE competitor_ads_cache ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "public_read_ads_cache"
+  ON competitor_ads_cache FOR SELECT
+  USING (true);
+
+CREATE POLICY "public_insert_ads_cache"
+  ON competitor_ads_cache FOR INSERT
+  WITH CHECK (true);

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { format, addDays, subDays } from "date-fns";
+import { createClient } from "@/lib/supabase/server";
 import {
   formatWaybackTimestamp,
   saturdayToWednesday,
@@ -129,6 +130,21 @@ export async function GET(request: Request) {
     ? new Date(`${weekEndParam}T12:00:00`)
     : getMostRecentSaturday();
 
+  const weekEndKey = format(saturday, "yyyy-MM-dd");
+
+  const supabase = createClient();
+  const { data: cached } = await supabase
+    .from("competitor_ads_cache")
+    .select("data")
+    .eq("week_end", weekEndKey)
+    .single();
+
+  if (cached) {
+    return NextResponse.json(cached.data, {
+      headers: { "Cache-Control": "s-maxage=86400, stale-while-revalidate=86400" },
+    });
+  }
+
   const prevWed = saturdayToWednesday(saturday);
   const lastYearWed = saturdayToWednesday(subDays(saturday, 364));
 
@@ -182,6 +198,10 @@ export async function GET(request: Request) {
     lastYearLabel,
     retailers,
   };
+
+  await supabase
+    .from("competitor_ads_cache")
+    .insert({ week_end: weekEndKey, data: response });
 
   return NextResponse.json(response, {
     headers: { "Cache-Control": "s-maxage=86400, stale-while-revalidate=86400" },
