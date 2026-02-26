@@ -7,6 +7,9 @@ import {
   getMostRecentSaturday,
 } from "@/lib/utils/dates";
 import type { CompetitorAdsApiResponse, RetailerAdData, RetailerSnapshot } from "@/types/competitor-ads";
+import { cacheScreenshotsForWeek } from "@/lib/competitor-ads/screenshotCache";
+
+export const maxDuration = 300;
 
 const CDX_BASE = "http://web.archive.org/cdx/search/cdx";
 
@@ -87,7 +90,7 @@ async function getCdxSnapshot(
     if (!rows || rows.length < 2) {
       // No results — widen to ±14 days if default window failed
       if (windowDays < 14) return getCdxSnapshot(url, targetDate, label, 14);
-      return { archiveUrl: null, timestamp: null, date: null, label, error: null };
+      return { archiveUrl: null, timestamp: null, date: null, label, error: null, screenshotUrl: null };
     }
 
     // rows[0] is the header row; find data row with timestamp closest to targetDate
@@ -111,6 +114,7 @@ async function getCdxSnapshot(
       date: formatWaybackTimestamp(timestamp),
       label,
       error: null,
+      screenshotUrl: null,
     };
   } catch (e) {
     return {
@@ -119,6 +123,7 @@ async function getCdxSnapshot(
       date: null,
       label,
       error: e instanceof Error ? e.message : "CDX lookup failed",
+      screenshotUrl: null,
     };
   }
 }
@@ -140,7 +145,14 @@ export async function GET(request: Request) {
     .single();
 
   if (cached) {
-    return NextResponse.json(cached.data, {
+    const data = cached.data as CompetitorAdsApiResponse;
+    const needsScreenshots = data.retailers.some(
+      (r) =>
+        (r.prevWeek.archiveUrl && !r.prevWeek.screenshotUrl) ||
+        (r.lastYear.archiveUrl && !r.lastYear.screenshotUrl)
+    );
+    if (needsScreenshots) void cacheScreenshotsForWeek(weekEndKey, data);
+    return NextResponse.json(data, {
       headers: { "Cache-Control": "s-maxage=86400, stale-while-revalidate=86400" },
     });
   }
@@ -177,6 +189,7 @@ export async function GET(request: Request) {
     date: null,
     label,
     error: "Request failed",
+    screenshotUrl: null,
   });
 
   const retailers: RetailerAdData[] = results.map((r, i) => {
@@ -202,6 +215,8 @@ export async function GET(request: Request) {
   await supabase
     .from("competitor_ads_cache")
     .insert({ week_end: weekEndKey, data: response });
+
+  void cacheScreenshotsForWeek(weekEndKey, response);
 
   return NextResponse.json(response, {
     headers: { "Cache-Control": "s-maxage=86400, stale-while-revalidate=86400" },

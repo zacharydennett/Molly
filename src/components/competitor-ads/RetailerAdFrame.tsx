@@ -11,13 +11,16 @@ interface SnapshotPaneProps {
 }
 
 function SnapshotPane({ snapshot, retailerName, retailerColor }: SnapshotPaneProps) {
+  const isScreenshot = !!snapshot.screenshotUrl;
+  const hasContent = !!(snapshot.screenshotUrl ?? snapshot.archiveUrl);
+
   const [status, setStatus] = useState<"loading" | "loaded" | "failed">(
-    snapshot.archiveUrl ? "loading" : "failed"
+    hasContent ? "loading" : "failed"
   );
 
   useEffect(() => {
-    setStatus(snapshot.archiveUrl ? "loading" : "failed");
-  }, [snapshot.archiveUrl]);
+    setStatus(hasContent ? "loading" : "failed");
+  }, [snapshot.screenshotUrl, snapshot.archiveUrl, hasContent]);
 
   return (
     <div className="flex flex-col gap-2 min-w-0">
@@ -37,25 +40,43 @@ function SnapshotPane({ snapshot, retailerName, retailerColor }: SnapshotPanePro
         )}
       </div>
 
-      {/* iframe or fallback */}
-      {snapshot.archiveUrl && status !== "failed" ? (
+      {/* Screenshot img, iframe, or fallback */}
+      {hasContent && status !== "failed" ? (
         <div className="relative rounded-lg overflow-hidden border border-slate-200">
           {status === "loading" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 gap-2">
               <div className="animate-spin rounded-full border-2 border-slate-300 border-t-molly-navy h-6 w-6" />
-              <p className="text-xs text-molly-slate">Loading Wayback Machine archive…</p>
-              <p className="text-xs text-molly-slate opacity-60">This can take 1–2 minutes</p>
+              {isScreenshot ? (
+                <p className="text-xs text-molly-slate">Loading cached screenshot…</p>
+              ) : (
+                <>
+                  <p className="text-xs text-molly-slate">Loading Wayback Machine archive…</p>
+                  <p className="text-xs text-molly-slate opacity-60">This can take 1–2 minutes</p>
+                </>
+              )}
             </div>
           )}
-          <iframe
-            src={snapshot.archiveUrl}
-            className="w-full border-0"
-            style={{ height: "560px" }}
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-            onLoad={() => setStatus("loaded")}
-            onError={() => setStatus("failed")}
-            title={`${retailerName} — ${snapshot.label}`}
-          />
+          {isScreenshot ? (
+            <div className="overflow-y-auto" style={{ height: "560px" }}>
+              <img
+                src={snapshot.screenshotUrl!}
+                alt={`${retailerName} — ${snapshot.label}`}
+                className="w-full"
+                onLoad={() => setStatus("loaded")}
+                onError={() => setStatus("failed")}
+              />
+            </div>
+          ) : (
+            <iframe
+              src={snapshot.archiveUrl!}
+              className="w-full border-0"
+              style={{ height: "560px" }}
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+              onLoad={() => setStatus("loaded")}
+              onError={() => setStatus("failed")}
+              title={`${retailerName} — ${snapshot.label}`}
+            />
+          )}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center gap-3 py-10 px-4 bg-slate-50 rounded-lg border-2 border-dashed border-slate-200 h-48">
@@ -85,7 +106,7 @@ function SnapshotPane({ snapshot, retailerName, retailerColor }: SnapshotPanePro
         </div>
       )}
 
-      {/* Open in new tab — always visible so users don't have to wait for the slow iframe */}
+      {/* Open in new tab — always uses canonical Wayback Machine URL */}
       {snapshot.archiveUrl && (
         <a
           href={snapshot.archiveUrl}
@@ -94,7 +115,7 @@ function SnapshotPane({ snapshot, retailerName, retailerColor }: SnapshotPanePro
           className="self-start inline-flex items-center gap-1 text-xs text-molly-navy font-medium hover:underline"
         >
           <Archive className="w-3 h-3" />
-          {status === "loading" ? "Open in new tab while loading…" : "Open in new tab"}
+          {!isScreenshot && status === "loading" ? "Open in new tab while loading…" : "Open in new tab"}
         </a>
       )}
     </div>

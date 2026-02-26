@@ -4,6 +4,7 @@ export interface RetailerSnapshot {
   date: string | null;
   label: string;
   error: string | null;
+  screenshotUrl: string | null; // Supabase Storage PNG URL; null until screenshot is ready
 }
 
 export interface RetailerAdData {

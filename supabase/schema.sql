@@ -61,3 +61,22 @@ CREATE POLICY "public_read_ads_cache"
 CREATE POLICY "public_insert_ads_cache"
   ON competitor_ads_cache FOR INSERT
   WITH CHECK (true);
+
+-- Allow server-side UPDATE (used by screenshotCache.ts to write screenshotUrls back)
+CREATE POLICY "service_update_ads_cache"
+  ON competitor_ads_cache FOR UPDATE
+  USING (true)
+  WITH CHECK (true);
+
+-- ============================================================
+-- COMPETITOR ADS SCREENSHOTS — Storage bucket (manual step)
+-- ============================================================
+-- 1. Go to Supabase Dashboard → Storage
+-- 2. Create a new bucket named: competitor-ads-screenshots
+-- 3. Set it to PUBLIC (so <img> tags can load PNGs without auth)
+-- 4. Add your service_role key to .env.local:
+--      SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+--    (Dashboard → Project Settings → API → service_role secret)
+--
+-- The existing JSONB `data` column in competitor_ads_cache stores
+-- screenshotUrl strings alongside archiveUrl — no schema change needed.
