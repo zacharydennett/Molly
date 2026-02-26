@@ -13,7 +13,7 @@ export function Leaderboard({ highlightScore }: Props) {
   const { scores, isLoading } = useTetrisScores();
 
   return (
-    <Card className="min-w-[200px]">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-1.5">
           <Trophy className="w-4 h-4 text-molly-amber" />
@@ -22,7 +22,7 @@ export function Leaderboard({ highlightScore }: Props) {
       </CardHeader>
       {isLoading ? (
         <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: 10 }).map((_, i) => (
             <div key={i} className="h-6 bg-slate-100 rounded animate-pulse" />
           ))}
         </div>

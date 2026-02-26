@@ -132,7 +132,7 @@ export function TetrisGame() {
         </div>
 
         {/* Side panel */}
-        <div className="flex flex-row lg:flex-col gap-4 w-full lg:w-48 flex-wrap">
+        <div className="flex flex-row lg:flex-col gap-4 w-full lg:w-64 flex-wrap">
           {/* Score */}
           <Card className="flex-1 lg:flex-none">
             <div className="space-y-3">
