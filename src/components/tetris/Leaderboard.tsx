@@ -55,13 +55,13 @@ export function Leaderboard({ highlightScore }: Props) {
                 >
                   {i + 1}
                 </span>
-                <span className="font-semibold text-molly-ink flex-1 truncate text-left">
+                <span className="font-semibold text-molly-ink flex-1 min-w-0 truncate text-left">
                   {s.player_name}
                 </span>
-                <span className="flex-1 text-right font-mono text-xs text-molly-slate">
+                <span className="font-mono text-xs text-molly-slate whitespace-nowrap">
                   {formatScore(s.score)}
                 </span>
-                <span className="text-xs text-molly-slate">Lv{s.level}</span>
+                <span className="text-xs text-molly-slate whitespace-nowrap">Lv{s.level}</span>
               </li>
             );
           })}
