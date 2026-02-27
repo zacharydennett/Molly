@@ -8,6 +8,7 @@ import {
 } from "@/lib/utils/dates";
 import type { CompetitorAdsApiResponse, RetailerAdData, RetailerSnapshot } from "@/types/competitor-ads";
 import { cacheScreenshotsForWeek } from "@/lib/competitor-ads/screenshotCache";
+import { waitUntil } from "@vercel/functions";
 
 export const maxDuration = 300;
 
@@ -151,7 +152,7 @@ export async function GET(request: Request) {
         (r.prevWeek.archiveUrl && !r.prevWeek.screenshotUrl) ||
         (r.lastYear.archiveUrl && !r.lastYear.screenshotUrl)
     );
-    if (needsScreenshots) void cacheScreenshotsForWeek(weekEndKey, data);
+    if (needsScreenshots) waitUntil(cacheScreenshotsForWeek(weekEndKey, data));
     return NextResponse.json(data, {
       headers: { "Cache-Control": "s-maxage=86400, stale-while-revalidate=86400" },
     });
@@ -216,7 +217,7 @@ export async function GET(request: Request) {
     .from("competitor_ads_cache")
     .insert({ week_end: weekEndKey, data: response });
 
-  void cacheScreenshotsForWeek(weekEndKey, response);
+  waitUntil(cacheScreenshotsForWeek(weekEndKey, response));
 
   return NextResponse.json(response, {
     headers: { "Cache-Control": "s-maxage=86400, stale-while-revalidate=86400" },

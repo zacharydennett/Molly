@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { chromium } from "playwright";
 import type { CompetitorAdsApiResponse, RetailerAdData, RetailerSnapshot } from "@/types/competitor-ads";
 
 const BUCKET = "competitor-ads-screenshots";
@@ -55,6 +54,22 @@ async function uploadScreenshot(
   return data.publicUrl ?? null;
 }
 
+// Launches Chromium: uses @sparticuz/chromium on Vercel (Linux serverless),
+// falls back to locally installed browser in development.
+async function launchBrowser() {
+  const { chromium } = await import("playwright-core");
+  if (process.env.VERCEL) {
+    const sparticuz = (await import("@sparticuz/chromium")).default;
+    return chromium.launch({
+      args: sparticuz.args,
+      executablePath: await sparticuz.executablePath(),
+      headless: true,
+    });
+  }
+  // Local dev: uses browser installed by `playwright install chromium`
+  return chromium.launch({ headless: true });
+}
+
 // Main entry point — called fire-and-forget after API response is sent.
 // For each snapshot with archiveUrl but no screenshotUrl:
 //   - visit URL with Playwright, take screenshot, upload to Storage
@@ -88,7 +103,7 @@ export async function cacheScreenshotsForWeek(
   if (work.length === 0) return;
 
   const results: { retailerIdx: number; slot: string; screenshotUrl: string | null }[] = [];
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchBrowser();
 
   try {
     for (let i = 0; i < work.length; i += BATCH_SIZE) {
